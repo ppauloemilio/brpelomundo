@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { getDb, parseJson, userSnapshot, UserRow } from '../db/database.js';
 import { authMiddleware, AuthRequest, createNotification } from '../middleware/auth.js';
-
 import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
+import { paramId } from '../lib/params.js';
 
 const router = Router();
 
@@ -142,17 +142,19 @@ router.post('/', authMiddleware, (req: AuthRequest, res) => {
 });
 
 router.delete('/:id', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
-  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id) as { author_id: string } | undefined;
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as { author_id: string } | undefined;
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
   if (post.author_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
-  db.prepare('UPDATE posts SET is_active = 0 WHERE id = ?').run(req.params.id);
+  db.prepare('UPDATE posts SET is_active = 0 WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 
 router.post('/:id/like', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
-  const post = db.prepare('SELECT * FROM posts WHERE id = ? AND is_active = 1').get(req.params.id) as
+  const post = db.prepare('SELECT * FROM posts WHERE id = ? AND is_active = 1').get(id) as
     | { id: string; author_id: string; likes_count: number }
     | undefined;
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
@@ -170,24 +172,25 @@ router.post('/:id/like', authMiddleware, (req: AuthRequest, res) => {
 });
 
 router.delete('/:id/like', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
-  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id) as { likes_count: number } | undefined;
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(id) as { likes_count: number } | undefined;
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
 
-  const stmt = db.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?');
-  stmt.run(req.params.id, req.user!.id);
-  if (stmt.changes > 0) {
-    db.prepare('UPDATE posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?').run(req.params.id);
+  const result = db.prepare('DELETE FROM likes WHERE post_id = ? AND user_id = ?').run(id, req.user!.id);
+  if (result.changes > 0) {
+    db.prepare('UPDATE posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = ?').run(id);
   }
-  const updated = db.prepare('SELECT likes_count FROM posts WHERE id = ?').get(req.params.id) as { likes_count: number };
+  const updated = db.prepare('SELECT likes_count FROM posts WHERE id = ?').get(id) as { likes_count: number };
   res.json({ ok: true, likes_count: updated.likes_count });
 });
 
 router.get('/:id/comments', authMiddleware, (req, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
   const comments = db.prepare(
     'SELECT * FROM comments WHERE post_id = ? AND is_active = 1 ORDER BY created_at ASC'
-  ).all(req.params.id);
+  ).all(id);
   res.json(
     comments.map((c) => ({
       ...c,
@@ -197,24 +200,25 @@ router.get('/:id/comments', authMiddleware, (req, res) => {
 });
 
 router.post('/:id/comments', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const { content } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Comentário vazio' });
 
   const db = getDb();
-  const post = db.prepare('SELECT * FROM posts WHERE id = ? AND is_active = 1').get(req.params.id) as
+  const post = db.prepare('SELECT * FROM posts WHERE id = ? AND is_active = 1').get(id) as
     | { id: string; author_id: string }
     | undefined;
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user!.id) as UserRow;
-  const id = uuid();
+  const commentId = uuid();
   db.prepare(
     'INSERT INTO comments (id, post_id, author_id, content, author_snapshot) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, post.id, user.id, content.trim(), userSnapshot(user));
+  ).run(commentId, post.id, user.id, content.trim(), userSnapshot(user));
   db.prepare('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?').run(post.id);
   createNotification(post.author_id, user.id, 'comment', 'post', post.id);
 
-  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(id);
+  const comment = db.prepare('SELECT * FROM comments WHERE id = ?').get(commentId);
   res.status(201).json({
     ...comment,
     author_snapshot: parseJson((comment as { author_snapshot: string }).author_snapshot, {}),
@@ -222,15 +226,16 @@ router.post('/:id/comments', authMiddleware, (req: AuthRequest, res) => {
 });
 
 router.post('/:id/share', authMiddleware, (req: AuthRequest, res) => {
+  const postId = paramId(req.params.id);
   const db = getDb();
-  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(req.params.id);
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(postId);
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
 
   const id = uuid();
   db.prepare('INSERT INTO shares (id, post_id, user_id, post_snapshot) VALUES (?, ?, ?, ?)').run(
-    id, req.params.id, req.user!.id, JSON.stringify(post)
+    id, postId, req.user!.id, JSON.stringify(post)
   );
-  createNotification((post as { author_id: string }).author_id, req.user!.id, 'share', 'post', req.params.id);
+  createNotification((post as { author_id: string }).author_id, req.user!.id, 'share', 'post', postId);
   res.status(201).json({ ok: true });
 });
 

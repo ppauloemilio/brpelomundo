@@ -42,7 +42,7 @@ export function GroupsPage() {
   });
 
   const createGroup = useMutation({
-    mutationFn: () => api('/groups', { method: 'POST', body: JSON.stringify(form) }),
+    mutationFn: () => api<Group>('/groups', { method: 'POST', body: JSON.stringify(form) }),
     onSuccess: (g: Group) => {
       qc.invalidateQueries({ queryKey: ['groups'] });
       setShowCreate(false);

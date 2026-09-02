@@ -22,6 +22,7 @@ export function FeedSidebar() {
       trending: Array<{ id: string; content: string; likes_count: number }>;
       users: Array<{ id: string; full_name: string; username: string; avatar_url: string | null; current_country: string; address?: string }>;
       country: string;
+      city?: string;
     }>('/feed/sidebar'),
   });
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Heart, MessageCircle, Share2, MoreHorizontal, MapPin, Trash2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, assetUrl } from '@/lib/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -139,7 +139,7 @@ export function PostCard({ post }: { post: Post }) {
         {post.images?.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-slate-100">
             {post.images.map((img) => (
-              <img key={img} src={img} alt="" className="max-h-96 w-full object-cover" />
+              <img key={img} src={assetUrl(img) ?? img} alt="" className="max-h-96 w-full object-cover" />
             ))}
           </div>
         )}

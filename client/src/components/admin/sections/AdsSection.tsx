@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, uploadFile } from '@/lib/api';
+import { api, assetUrl, uploadFile } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -66,7 +66,7 @@ export function AdsSection() {
         <Card key={ad.id}>
           <CardContent className="flex items-center justify-between gap-4 pt-4">
             <div className="flex min-w-0 items-center gap-3">
-              <img src={ad.image_url} alt="" className="h-12 w-20 shrink-0 rounded object-cover" />
+              <img src={assetUrl(ad.image_url) ?? ad.image_url} alt="" className="h-12 w-20 shrink-0 rounded object-cover" />
               <div className="min-w-0">
                 <p className="truncate font-medium">{ad.title}</p>
                 <p className="text-xs text-slate-500">{ad.is_active ? t('admin.active') : t('admin.inactive')}</p>

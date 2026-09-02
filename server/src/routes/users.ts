@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import bcrypt from 'bcryptjs';
+import type { SQLInputValue } from 'node:sqlite';
 import { getDb, parseJson, UserRow } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { isPremiumProfile } from '../lib/settings.js';
+import { paramId } from '../lib/params.js';
 
 const router = Router();
 
@@ -53,7 +55,8 @@ function profileStats(db: ReturnType<typeof getDb>, userId: string) {
 }
 
 router.get('/', authMiddleware, (req, res) => {
-  const { q, country } = req.query;
+  const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+  const country = typeof req.query.country === 'string' ? req.query.country : undefined;
   const db = getDb();
   let users: UserRow[];
 
@@ -83,18 +86,19 @@ router.get('/', authMiddleware, (req, res) => {
   );
 });
 
-router.get('/:id/posts', authMiddleware, (req, res) => {
+router.get('/:id/posts', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
   const posts = db.prepare(
     'SELECT * FROM posts WHERE author_id = ? AND is_active = 1 ORDER BY created_at DESC'
-  ).all(req.params.id);
+  ).all(id);
 
   const likes = db.prepare('SELECT post_id FROM likes WHERE user_id = ?').all(req.user!.id) as { post_id: string }[];
   const likedSet = new Set(likes.map((l) => l.post_id));
 
   const authorProfile = db.prepare(
     'SELECT is_premium, premium_until FROM public_profiles WHERE user_id = ?'
-  ).get(req.params.id) as { is_premium: number; premium_until: string | null } | undefined;
+  ).get(id) as { is_premium: number; premium_until: string | null } | undefined;
   const authorIsPremium = isPremiumProfile(authorProfile);
 
   res.json(
@@ -115,13 +119,13 @@ router.get('/:id/businesses', authMiddleware, (req, res) => {
   const db = getDb();
   const businesses = db.prepare(
     'SELECT id, name, category, address, country FROM businesses WHERE owner_id = ? AND is_active = 1 ORDER BY created_at DESC'
-  ).all(req.params.id);
+  ).all(paramId(req.params.id));
   res.json(businesses);
 });
 
 router.get('/:id', authMiddleware, (req: AuthRequest, res) => {
   const db = getDb();
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id) as UserRow | undefined;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(paramId(req.params.id)) as UserRow | undefined;
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
   const profile = db.prepare('SELECT * FROM public_profiles WHERE user_id = ?').get(user.id) as Record<string, unknown>;
@@ -175,9 +179,9 @@ router.patch('/me/profile', authMiddleware, (req: AuthRequest, res) => {
   }
 
   const profileUpdates: string[] = [];
-  const profileParams: unknown[] = [];
+  const profileParams: SQLInputValue[] = [];
 
-  const setProfile = (column: string, value: unknown) => {
+  const setProfile = (column: string, value: SQLInputValue | undefined) => {
     if (value !== undefined) {
       profileUpdates.push(`${column} = ?`);
       profileParams.push(value);
@@ -259,7 +263,7 @@ router.post('/me/skills', authMiddleware, (req: AuthRequest, res) => {
 
 router.delete('/me/skills/:id', authMiddleware, (req: AuthRequest, res) => {
   const db = getDb();
-  db.prepare('DELETE FROM user_skills WHERE id = ? AND user_id = ?').run(req.params.id, req.user!.id);
+  db.prepare('DELETE FROM user_skills WHERE id = ? AND user_id = ?').run(paramId(req.params.id), req.user!.id);
   res.json({ ok: true });
 });
 

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ImagePlus, MapPin, X } from 'lucide-react';
-import { api, uploadFile } from '@/lib/api';
+import { api, assetUrl, uploadFile } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -162,7 +162,7 @@ export function CreatePostPage() {
             <div className="flex flex-wrap gap-2">
               {images.map((url) => (
                 <div key={url} className="relative h-24 w-24 overflow-hidden rounded-lg border border-slate-200">
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <img src={assetUrl(url) ?? url} alt="" className="h-full w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => setImages((prev) => prev.filter((u) => u !== url))}

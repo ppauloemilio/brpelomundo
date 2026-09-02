@@ -3,16 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { Camera, Loader2 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
+import { assetUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 function CoverImage({ src, alt }: { src: string; alt: string }) {
+  const resolved = assetUrl(src) ?? src;
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setLoaded(false);
     setFailed(false);
-  }, [src]);
+  }, [resolved]);
 
   return (
     <>
@@ -20,7 +22,7 @@ function CoverImage({ src, alt }: { src: string; alt: string }) {
         <div className="absolute inset-0 animate-pulse bg-brand-400/40" />
       )}
       <img
-        src={src}
+        src={resolved}
         alt={alt}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}

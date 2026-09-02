@@ -23,15 +23,31 @@ import billingRoutes from './routes/billing.js';
 
 const PORT = Number(process.env.PORT) || 3001;
 
+/** Origens permitidas (APP_URL e/ou CORS_ORIGIN separados por vírgula). Sem isso, libera tudo. */
+function resolveCorsOrigin(): boolean | string | string[] {
+  const listed = [
+    ...(process.env.CORS_ORIGIN?.split(',') ?? []),
+    process.env.APP_URL ?? '',
+  ]
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (listed.length === 0) return true;
+  return listed.length === 1 ? listed[0] : listed;
+}
+
+const corsOrigin = resolveCorsOrigin();
+
 getDb();
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: { origin: '*' } });
+const io = new Server(httpServer, {
+  cors: { origin: corsOrigin === true ? '*' : corsOrigin, methods: ['GET', 'POST'] },
+});
 
 setSocketIO(io);
 
-app.use(cors());
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
 

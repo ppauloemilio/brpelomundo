@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { getDb, parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest, createNotification } from '../middleware/auth.js';
+import { paramId } from '../lib/params.js';
 import type { Server as SocketServer } from 'socket.io';
 
 let io: SocketServer | null = null;
@@ -83,8 +84,9 @@ router.post('/', authMiddleware, (req: AuthRequest, res) => {
 });
 
 router.get('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
-  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id) as
+  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as
     | { participant_ids: string }
     | undefined;
   if (!conversation) return res.status(404).json({ error: 'Conversa não encontrada' });
@@ -94,28 +96,29 @@ router.get('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
 
   const messages = db.prepare(
     'SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at ASC'
-  ).all(req.params.id);
+  ).all(id);
 
   const unread = parseJson(
-    (db.prepare('SELECT unread_count FROM conversations WHERE id = ?').get(req.params.id) as { unread_count: string }).unread_count,
+    (db.prepare('SELECT unread_count FROM conversations WHERE id = ?').get(id) as { unread_count: string }).unread_count,
     {} as Record<string, number>
   );
   unread[req.user!.id] = 0;
-  db.prepare('UPDATE conversations SET unread_count = ? WHERE id = ?').run(JSON.stringify(unread), req.params.id);
+  db.prepare('UPDATE conversations SET unread_count = ? WHERE id = ?').run(JSON.stringify(unread), id);
 
   db.prepare(
     'UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_id != ?'
-  ).run(req.params.id, req.user!.id);
+  ).run(id, req.user!.id);
 
   res.json(messages.map((m) => ({ ...m, is_read: !!(m as { is_read: number }).is_read })));
 });
 
 router.post('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
+  const conversationId = paramId(req.params.id);
   const { content, attachment_url } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Mensagem vazia' });
 
   const db = getDb();
-  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(req.params.id) as
+  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) as
     | { participant_ids: string; unread_count: string }
     | undefined;
   if (!conversation) return res.status(404).json({ error: 'Conversa não encontrada' });
@@ -127,7 +130,7 @@ router.post('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
   const now = new Date().toISOString();
   db.prepare(
     'INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, req.params.id, req.user!.id, content.trim(), attachment_url || null);
+  ).run(id, conversationId, req.user!.id, content.trim(), attachment_url || null);
 
   const lastMessage = { id, content: content.trim(), sender_id: req.user!.id, created_at: now };
   const unread = parseJson(conversation.unread_count, {} as Record<string, number>);
@@ -136,15 +139,15 @@ router.post('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
   }
 
   db.prepare('UPDATE conversations SET last_message = ?, unread_count = ?, updated_at = ? WHERE id = ?').run(
-    JSON.stringify(lastMessage), JSON.stringify(unread), now, req.params.id
+    JSON.stringify(lastMessage), JSON.stringify(unread), now, conversationId
   );
 
   const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   for (const p of participants) {
-    if (p !== req.user!.id) createNotification(p, req.user!.id, 'message', 'conversation', req.params.id);
+    if (p !== req.user!.id) createNotification(p, req.user!.id, 'message', 'conversation', conversationId);
   }
 
-  io?.to(req.params.id).emit('new_message', message);
+  io?.to(conversationId).emit('new_message', message);
   res.status(201).json({ ...message, is_read: false });
 });
 

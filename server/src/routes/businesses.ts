@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { getDb, parseJson, userSnapshot, UserRow } from '../db/database.js';
 import { authMiddleware, AuthRequest, createNotification } from '../middleware/auth.js';
+import { paramId } from '../lib/params.js';
 
 const router = Router();
 
@@ -85,7 +86,7 @@ router.get('/mine', authMiddleware, (req: AuthRequest, res) => {
 
 router.get('/:id', authMiddleware, (req, res) => {
   const db = getDb();
-  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = paramId(req.params.id);
   const row = db.prepare(
     `SELECT b.*, u.full_name AS owner_name, u.username AS owner_username, u.avatar_url AS owner_avatar_url,
             (SELECT ROUND(AVG(r.rating), 1) FROM reviews r WHERE r.target_type = 'business' AND r.target_id = b.id AND r.is_active = 1) AS rating_avg,
@@ -124,8 +125,9 @@ router.post('/', authMiddleware, (req: AuthRequest, res) => {
 });
 
 router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
-  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.params.id) as { owner_id: string } | undefined;
+  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id) as { owner_id: string } | undefined;
   if (!business) return res.status(404).json({ error: 'Negócio não encontrado' });
   if (business.owner_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
 
@@ -155,10 +157,10 @@ router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
     photos ? JSON.stringify(photos) : null,
     social_links ? JSON.stringify(social_links) : null,
     is_active ?? null,
-    req.params.id
+    id
   );
 
-  const updated = db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.params.id);
+  const updated = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id);
   res.json({
     ...updated,
     skills: parseJson((updated as { skills: string }).skills, []),
@@ -168,11 +170,12 @@ router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
 });
 
 router.delete('/:id', authMiddleware, (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
   const db = getDb();
-  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.params.id) as { owner_id: string } | undefined;
+  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id) as { owner_id: string } | undefined;
   if (!business) return res.status(404).json({ error: 'Negócio não encontrado' });
   if (business.owner_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
-  db.prepare('UPDATE businesses SET is_active = 0 WHERE id = ?').run(req.params.id);
+  db.prepare('UPDATE businesses SET is_active = 0 WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 

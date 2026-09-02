@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
-import { api } from '@/lib/api';
+import { api, getApiBase } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -55,7 +55,8 @@ export function MessagesPage() {
 
   useEffect(() => {
     if (!activeId) return;
-    const socket = io({ path: '/socket.io' });
+    const base = getApiBase();
+    const socket = base ? io(base, { path: '/socket.io' }) : io({ path: '/socket.io' });
     socket.emit('join_conversation', activeId);
     socket.on('new_message', () => {
       qc.invalidateQueries({ queryKey: ['messages', activeId] });

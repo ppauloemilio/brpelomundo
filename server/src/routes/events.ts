@@ -138,9 +138,8 @@ router.post('/:id/interest', authMiddleware, (req: AuthRequest, res) => {
 router.delete('/:id/interest', authMiddleware, (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
   const db = getDb();
-  const stmt = db.prepare('DELETE FROM event_interests WHERE event_id = ? AND user_id = ?');
-  stmt.run(id, req.user!.id);
-  if (stmt.changes > 0) {
+  const result = db.prepare('DELETE FROM event_interests WHERE event_id = ? AND user_id = ?').run(id, req.user!.id);
+  if (result.changes > 0) {
     db.prepare(
       `UPDATE community_events SET interest_count = CASE WHEN interest_count > 0 THEN interest_count - 1 ELSE 0 END WHERE id = ?`
     ).run(id);

@@ -80,7 +80,7 @@ export function PricingPage() {
 
   const checkout = useMutation({
     mutationFn: () =>
-      api('/billing/checkout', {
+      api<{ message?: string }>('/billing/checkout', {
         method: 'POST',
         body: JSON.stringify({
           plan_code: selected,
