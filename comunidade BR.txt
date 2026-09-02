@@ -1,0 +1,257 @@
+Manifesto de Migração: Comunidade Brasil V2
+
+{
+  "projeto": "Comunidade Brasil V2",
+  "data_geracao": "2026-06-26",
+  "configuracoes_sistema": {
+    "landing_page": "Feed",
+    "layout_global": "Layout.jsx",
+    "stack": ["React", "Tailwind CSS", "shadcn/ui", "TanStack Query"]
+  },
+  "entidades": {
+    "Advertisement": ["title", "image_url", "link_url", "description", "is_active", "order", "start_date", "end_date"],
+    "Business": ["name", "category", "country", "owner_id", "latitude", "longitude", "skills", "photos", "social_links", "is_active"],
+    "Post": ["content", "type", "images", "author_id", "business_id", "likes_count", "comments_count", "is_active"],
+    "PublicProfile": ["user_id", "full_name", "bio", "current_country", "social_links", "languages"],
+    "Conversation": ["participant_ids", "type", "business_id", "last_message", "unread_count"],
+    "Message": ["conversation_id", "sender_id", "content", "attachment_url", "is_read", "is_deleted"],
+    "Friendship": ["requester_id", "receiver_id", "status"],
+    "Follow": ["follower_id", "following_id"],
+    "Location": ["Country", "State", "City"],
+    "UserSkills": ["user_id", "skill_name", "proficiency_level", "years_experience"],
+    "UserHistory": ["user_id", "country", "joined_at"]
+  },
+  "rotas_ui": [
+    { "rota": "/", "componente": "Feed", "layout": true },
+    { "rota": "/BusinessMap", "componente": "BusinessMap", "layout": true },
+    { "rota": "/Explore", "componente": "Explore", "layout": true },
+    { "rota": "/Community", "componente": "Community", "layout": true },
+    { "rota": "/Profile", "componente": "Profile", "layout": true },
+    { "rota": "/Messages", "componente": "Messages", "layout": true },
+    { "rota": "/MyBusinesses", "componente": "MyBusinesses", "layout": true },
+    { "rota": "/CreatePost", "componente": "CreatePost", "layout": true }
+  ],
+  "regras_negocio": {
+    "geofiltro": {
+      "desc": "Posts no feed respeitam a data de entrada do usuário no país.",
+      "logica": "filtrar posts onde post.created_date >= user.joined_at_in_country"
+    },
+    "integridade_dados": {
+      "exclusao": "Utilizar soft-delete (is_active: false) para Posts e Negócios.",
+      "desnormalizacao": "Manter snapshots de autor/dados em entidades de engajamento (Like, Comment, Share)."
+    },
+    "engajamento": {
+      "likes": "Incremento/Decremento direto no contador da entidade Post ao criar/deletar entidade Like.",
+      "notificacoes": "Disparar entidade Notification para cada interação social."
+    }
+  }
+}
+
+----------------------------------------------------------------------------------------------------
+
+
+1. Mapeamento de Entidades (Schema Snapshot)
+Aqui estão as entidades que compõem o seu ecossistema de dados atual:
+
+Social & Conteúdo:
+Post: Gerencia o feed, tipos (texto, imagem, promo, evento), metadados e contador de interações.
+Comment & Like: Interações sociais sobre posts e comentários.
+Share: Compartilhamento de conteúdo.
+Follow: Conexões entre usuários.
+Friendship: Solicitações e vínculos de amizade.
+Negócios & Localização:
+Business: Perfil completo da empresa (proprietário, endereço geolocalizado, links sociais, fotos).
+Country, State, City: Estrutura de localização geográfica do app.
+Perfil & Usuário:
+PublicProfile: Dados públicos do usuário (bio, redes, fotos, moradia).
+UserCountryHistory: Histórico de moradia do usuário para filtrar o feed.
+Skill & UserSkill: Habilidades profissionais dos usuários.
+Comunicação:
+Conversation: Gerencia conversas (User-User ou User-Business).
+Message: Histórico de mensagens, anexos e status de leitura/deleção.
+Notification: Sistema de alertas do sistema.
+--------------------------------------------------------------------------------------------------------------------
+
+1. Estrutura de Dados (Entities)
+O sistema baseia-se em 18 entidades principais. O foco da migração deve ser a replicação da estrutura JSON e das permissões de leitura/escrita.
+
+Publicação e Engajamento: Post, Comment, Like, Share, Notification.
+Negócios: Business, Advertisement.
+Perfil e Social: PublicProfile, Friendship, Follow, UserSkill, Skill.
+Geografia: Country, State, City, UserCountryHistory.
+Comunicação: Conversation, Message.
+(Consulte o esquema detalhado nas respostas anteriores para cada um destes arquivos JSON).
+
+2. Mapa de Rotas e UI (Arquitetura)
+A aplicação é construída sobre um roteador único com LayoutWrapper global.
+
+Página Principal: /Feed (Landing page).
+Estrutura Global: Header (Desktop/Mobile), Bottom Navigation (Mobile), e Overlays (Mobile Menu).
+Tecnologias de Interface: React (Vite), Tailwind CSS, shadcn/ui (primitivas Radix), lucide-react (ícones), TanStack Query (cache de estado).
+Notas para Migração: Ao mudar de ambiente, certifique-se de replicar o Layout.jsx, pois ele centraliza as chamadas de API para notificações (Notification) e conversas (Conversation), que alimentam as badges de alerta em toda a interface.
+3. Regras de Negócio e Fluxos (Lógica Core)
+A. O "Geofiltro" (Regra de Ouro)
+O Feed.jsx contém a lógica mais importante do sistema. Para replicar o comportamento atual, o novo backend/frontend deve:
+
+Consultar o histórico do usuário (UserCountryHistory).
+Comparar post.created_date com o joined_at do histórico do país do autor.
+Ocultar posts de membros do mesmo país que tenham sido criados antes da entrada do usuário atual na comunidade local.
+B. Ciclo de Vida de Dados
+Soft-Delete: NUNCA deletar fisicamente registros de Business ou Post. Utilize a flag is_active: false.
+Snapshot de Dados: A entidade Share salva um snapshot do post original. Isso é fundamental para manter a integridade visual se o post original for deletado ou editado.
+Desnormalização: Para manter a performance, as entidades de engajamento (Like, Follow, Comment) replicam dados básicos do autor (name, photo, username). Isso evita a necessidade de realizar "JOINs" lentos entre o usuário e o post.
+C. Comunicação
+O sistema de chat funciona em dois tipos: user_user e user_business. A entidade Conversation armazena o estado das mensagens não lidas (unread_count) via um objeto, facilitando a contagem por participante no frontend.
+
+-----------------------------------------------------------------------------------------------------------------
+
+Manifesto de Entidades: Comunidade Brasil V2
+{
+  "versao_sistema": "2.0",
+  "entidades": {
+    "Advertisement": {
+      "descricao": "Gerenciamento de banners publicitários",
+      "campos": {
+        "title": "string (obrigatório)",
+        "image_url": "string (obrigatório)",
+        "link_url": "string",
+        "description": "string",
+        "is_active": "boolean",
+        "order": "number",
+        "start_date": "date",
+        "end_date": "date"
+      }
+    },
+    "Business": {
+      "descricao": "Perfil completo de empresas e negócios",
+      "campos": {
+        "name": "string (obrigatório)",
+        "category": "enum (restaurant, law, accounting, etc.)",
+        "country": "string (obrigatório)",
+        "owner_id": "string (obrigatório)",
+        "latitude/longitude": "number",
+        "skills": "array of strings",
+        "photos": "array of urls",
+        "social_links": "object (instagram, facebook, linkedin)"
+      }
+    },
+    "Post": {
+      "descricao": "Feed de conteúdo (texto, fotos, promoções, vagas, eventos)",
+      "campos": {
+        "content": "string (obrigatório)",
+        "type": "enum (text, image, business_promo, job, event)",
+        "images": "array of urls",
+        "author_id": "string",
+        "business_id": "string (opcional)",
+        "likes_count": "number",
+        "comments_count": "number"
+      }
+    },
+    "PublicProfile": {
+      "descricao": "Perfil público do usuário",
+      "campos": {
+        "user_id": "string (obrigatório)",
+        "full_name": "string",
+        "bio": "string",
+        "current_country": "string",
+        "social_links": "object",
+        "languages": "array of strings"
+      }
+    },
+    "Conversation & Message": {
+      "descricao": "Histórico de chats entre usuários e empresas",
+      "campos_conv": "participant_ids, type, business_id, last_message",
+      "campos_msg": "conversation_id, sender_id, content, attachment_url, is_read"
+    },
+    "Friendship & Follow": {
+      "descricao": "Conexões sociais",
+      "campos_friend": "requester_id, receiver_id, status (pending/accepted)",
+      "campos_follow": "follower_id, following_id"
+    },
+    "Location (City/State/Country)": {
+      "descricao": "Estrutura geográfica do app",
+      "campos": "name, code, country_id, is_active"
+    },
+    "UserSkills & History": {
+      "descricao": "Dados profissionais e históricos de mudança de país",
+      "campos_skill": "user_id, skill_name, proficiency_level, years_experience",
+      "campos_history": "user_id, country, joined_at"
+    }
+  }
+}
+O que este manifesto representa:
+Estrutura Relacional: Identificamos que Post depende de Business (via business_id) e PublicProfile atua como a interface do usuário.
+Lógica Geográfica: O app usa Country, State e City para povoar os filtros e o perfil, enquanto UserCountryHistory é o que garante que o Feed mostre o conteúdo correto para quem mudou de país.
+Sistema de Notificações: A entidade Notification consolida os eventos de Like, Comment, Follow e Message.
+
+-----------------------------------------------------------------------------------------------------------------
+
+A "Etapa 2: Mapeamento de UI e Rotas" foca na experiência do usuário e na organização visual da sua aplicação. Abaixo, apresento como o seu sistema está estruturado:
+
+Mapa do Site (Rotas e Funcionalidades)
+A aplicação utiliza um roteador centralizado que envolve todas as páginas em um componente Layout (que contém a navegação global, busca, notificações e contagem de mensagens).
+
+Página	Rota	Propósito
+Feed	/Feed	Página Inicial. Exibe posts filtrados pela localização do usuário.
+BusinessMap	/BusinessMap	Mapa interativo com localização de empresas.
+Explore	/Explore	Ferramenta de descoberta de conteúdo.
+Community	/Community	Área social para encontrar outros usuários.
+Profile	/Profile	Dashboard pessoal (seu perfil).
+UserProfile	/UserProfile	Visualização de perfis públicos de terceiros.
+CreatePost	/CreatePost	Editor de texto rico para criar posts, eventos e vagas.
+Messages	/Messages	Centro de conversas (chats pessoais e com empresas).
+Notifications	/Notifications	Histórico de alertas sociais.
+MyBusinesses	/MyBusinesses	Gestão de empresas que o usuário possui.
+CreateBusiness	/CreateBusiness	Cadastro de nova empresa.
+EditBusiness	/EditBusiness	Edição de dados e coordenadas de empresa.
+PromoteBusiness	/PromoteBusiness	Área de publicidade.
+Settings	/Settings	Configurações gerais da conta.
+Arquitetura de Componentes
+Sua aplicação é modular e segue o padrão de componentes do shadcn/ui junto com componentes específicos da rede social:
+
+Layout & UI Global:
+Layout.jsx: O "coração" da navegação. Gerencia a renderização condicional (header desktop vs. mobile) e os estados de contagem de notificações/mensagens.
+components/ui/*: Biblioteca de componentes atômicos (Button, Input, Avatar, Dialog, etc.).
+Módulos do Feed:
+PostCard: Exibe o conteúdo individual.
+CreatePostCard: Card rápido para iniciar um post.
+BusinessPromoDialog: Componente dedicado para promover empresas.
+Módulos de Negócios:
+PostalCodeLookup: Integração para preenchimento automático de endereços.
+LocationPicker: Componente integrado ao mapa para selecionar coordenadas.
+Módulos de Comunicação:
+ChatWindow: Exibição da conversa ativa.
+FriendshipButton: Ação de solicitação de amizade.
+Observação importante para sua migração:
+Como a aplicação está em modo de discussão, note que:
+
+A página Feed é definida como sua mainPage.
+O componente Layout aplica uma lógica de LayoutWrapper em todas as rotas listadas no pages.config.js. Se você recriar a aplicação em outro ambiente, precisará garantir que esse "Wrapper" (que faz a checagem de usuário logado e injeta o header/footer) seja replicado.
+
+-----------------------------------------------------------------------------------------------------------------
+
+A "Etapa 3: Regras de Negócio e Fluxos Críticos" define como o sistema "pensa" e executa as ações mais importantes. Abaixo, o mapeamento dos fluxos que garantem o comportamento social e geográfico do Comunidade Brasil V2.
+
+1. Motor de Filtragem Geográfica (O diferencial social)
+A regra mais crítica do sistema está no componente Feed.jsx (linhas 62-92). Ela não é apenas uma lista de posts; é um filtro inteligente:
+
+Lógica de visibilidade: O sistema cruza o país atual do usuário com o UserCountryHistory.
+Data de Entrada: O usuário não vê posts antigos de um país que ele acabou de entrar. Ele só recebe conteúdo postado após a data (joined_at) registrada no histórico.
+Permissividade: Se o usuário nunca registrou uma data de entrada (ou mora lá há muito tempo), ele visualiza todo o histórico de posts daquela comunidade.
+2. Fluxo de Interações Sociais (Engagement Loop)
+O sistema gerencia o engajamento através de mutações no React Query, garantindo consistência:
+
+Like/Unlike:
+O sistema verifica se o postId já existe no userLikes (Set de IDs).
+Ao curtir: Cria a entidade Like com snapshot dos dados do usuário (nome, foto, username) e incrementa o likes_count diretamente na entidade Post.
+Ao descurtir: Remove a entidade Like e decrementa o contador, garantindo a integridade dos dados (Math.max(0, count - 1)).
+Realtime/Refresh: O uso de queryClient.invalidateQueries garante que o feed seja re-renderizado imediatamente após qualquer interação do usuário.
+3. Gestão de Entidades (Ciclo de Vida)
+Soft-Delete (Negócios e Posts): O sistema utiliza a flag is_active: true para "excluir" registros. Isso é crítico para manter o histórico de comentários e likes de um post ou empresa sem deletar fisicamente o registro do banco de dados.
+Desnormalização de Dados: O sistema armazena dados de autores e usuários em diversas entidades (Post, Comment, Like, Follow). Isso permite leitura rápida sem necessidade de "joins" complexos no frontend, otimizando o carregamento do feed.
+4. Fluxo de Notificações
+Sempre que uma interação ocorre (ex: alguém curte um post ou segue um usuário), a entidade Notification é criada com:
+
+actor_id (quem fez).
+target_type e target_id (o que foi afetado).
+A leitura da notificação dispara um is_read: true, que remove o indicador de contagem no Layout.jsx.
