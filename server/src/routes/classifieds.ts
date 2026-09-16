@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getDb, parseJson } from '../db/database.js';
+import { db } from '../db/sql.js';
+import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -30,8 +31,7 @@ function ratingSubquery() {
            WHERE r.target_type = 'classified' AND r.target_id = c.id AND r.is_active = 1) AS rating_count`;
 }
 
-router.get('/', authMiddleware, (req: AuthRequest, res) => {
-  const db = getDb();
+router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   const country = (req.query.country as string)?.trim();
   const city = (req.query.city as string)?.trim();
   const category = (req.query.category as string)?.trim();
@@ -39,9 +39,10 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
   const q = (req.query.q as string)?.trim();
   const mine = req.query.mine === '1';
 
-  const profile = db.prepare(
-    'SELECT current_country, current_city FROM public_profiles WHERE user_id = ?'
-  ).get(req.user!.id) as { current_country: string; current_city: string } | undefined;
+  const profile = await db.get<{ current_country: string; current_city: string }>(
+    'SELECT current_country, current_city FROM public_profiles WHERE user_id = ?',
+    [req.user!.id]
+  );
 
   const conditions = ['c.is_active = 1', "UPPER(TRIM(c.country)) != 'BR'"];
   const params: string[] = [];
@@ -68,11 +69,11 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
     params.push(category);
   }
   if (q) {
-    conditions.push('(c.title LIKE ? OR c.description LIKE ?)');
+    conditions.push('(c.title ILIKE ? OR c.description ILIKE ?)');
     params.push(`%${q}%`, `%${q}%`);
   }
 
-  const listings = db.prepare(
+  const listings = await db.all<Record<string, unknown>>(
     `SELECT c.*, u.full_name AS seller_name, u.username AS seller_username, u.avatar_url AS seller_avatar,
             u.is_verified AS seller_verified,
             ${ratingSubquery()}
@@ -83,32 +84,33 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
        CASE WHEN LOWER(TRIM(c.city)) = LOWER(?) THEN 0 ELSE 1 END,
        CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
        c.created_at DESC
-     LIMIT 60`
-  ).all(...params, (profile?.current_city || '').trim());
+     LIMIT 60`,
+    [...params, (profile?.current_city || '').trim()]
+  );
 
-  res.json(listings.map((row) => mapListing(row as Record<string, unknown>)));
+  res.json(listings.map((row) => mapListing(row)));
 });
 
 router.get('/categories', authMiddleware, (_req, res) => {
   res.json(CATEGORIES);
 });
 
-router.get('/:id', authMiddleware, (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
   const id = paramId(req.params.id);
-  const db = getDb();
-  const row = db.prepare(
+  const row = await db.get<Record<string, unknown>>(
     `SELECT c.*, u.full_name AS seller_name, u.username AS seller_username, u.avatar_url AS seller_avatar,
             u.is_verified AS seller_verified, u.email_verified AS seller_email_verified,
             ${ratingSubquery()}
      FROM classifieds c
      JOIN users u ON u.id = c.seller_id
-     WHERE c.id = ? AND c.is_active = 1`
-  ).get(id) as Record<string, unknown> | undefined;
+     WHERE c.id = ? AND c.is_active = 1`,
+    [id]
+  );
   if (!row) return res.status(404).json({ error: 'Anúncio não encontrado' });
   res.json(mapListing(row));
 });
 
-router.post('/', authMiddleware, (req: AuthRequest, res) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   const {
     title, description, category, price, currency, condition_label,
     city, country, photos, contact_whatsapp,
@@ -122,41 +124,42 @@ router.post('/', authMiddleware, (req: AuthRequest, res) => {
   }
 
   const id = uuid();
-  const db = getDb();
-  db.prepare(
+  await db.run(
     `INSERT INTO classifieds (
        id, title, description, category, price, currency, condition_label,
        city, country, photos, contact_whatsapp, seller_id
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    title.trim(),
-    description?.trim() || '',
-    category,
-    price != null && price !== '' ? Number(price) : null,
-    currency || 'USD',
-    condition_label || 'used',
-    city.trim(),
-    country.trim(),
-    JSON.stringify(Array.isArray(photos) ? photos : []),
-    contact_whatsapp?.trim() || '',
-    req.user!.id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      title.trim(),
+      description?.trim() || '',
+      category,
+      price != null && price !== '' ? Number(price) : null,
+      currency || 'USD',
+      condition_label || 'used',
+      city.trim(),
+      country.trim(),
+      JSON.stringify(Array.isArray(photos) ? photos : []),
+      contact_whatsapp?.trim() || '',
+      req.user!.id,
+    ]
   );
 
-  const row = db.prepare(
+  const row = await db.get<Record<string, unknown>>(
     `SELECT c.*, u.full_name AS seller_name, u.username AS seller_username, u.avatar_url AS seller_avatar,
             u.is_verified AS seller_verified, 0 AS rating_avg, 0 AS rating_count
-     FROM classifieds c JOIN users u ON u.id = c.seller_id WHERE c.id = ?`
-  ).get(id) as Record<string, unknown>;
-  res.status(201).json(mapListing(row));
+     FROM classifieds c JOIN users u ON u.id = c.seller_id WHERE c.id = ?`,
+    [id]
+  );
+  res.status(201).json(mapListing(row!));
 });
 
-router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
+router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const db = getDb();
-  const existing = db.prepare('SELECT * FROM classifieds WHERE id = ? AND is_active = 1').get(id) as
-    | { seller_id: string }
-    | undefined;
+  const existing = await db.get<{ seller_id: string }>(
+    'SELECT * FROM classifieds WHERE id = ? AND is_active = 1',
+    [id]
+  );
   if (!existing) return res.status(404).json({ error: 'Anúncio não encontrado' });
   if (existing.seller_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
 
@@ -172,12 +175,12 @@ router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
     return res.status(400).json({ error: 'Categoria inválida' });
   }
 
-  db.prepare(
+  await db.run(
     `UPDATE classifieds SET
        title = COALESCE(?, title),
        description = COALESCE(?, description),
        category = COALESCE(?, category),
-       price = CASE WHEN ? IS NOT NULL THEN ? ELSE price END,
+       price = CASE WHEN ?::integer IS NOT NULL THEN ?::double precision ELSE price END,
        currency = COALESCE(?, currency),
        condition_label = COALESCE(?, condition_label),
        city = COALESCE(?, city),
@@ -185,40 +188,42 @@ router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
        photos = COALESCE(?, photos),
        contact_whatsapp = COALESCE(?, contact_whatsapp),
        status = COALESCE(?, status)
-     WHERE id = ?`
-  ).run(
-    title?.trim() ?? null,
-    description?.trim() ?? null,
-    category ?? null,
-    price !== undefined ? 1 : null,
-    price !== undefined ? (price === '' || price == null ? null : Number(price)) : null,
-    currency ?? null,
-    condition_label ?? null,
-    city?.trim() ?? null,
-    country?.trim() ?? null,
-    photos !== undefined ? JSON.stringify(photos) : null,
-    contact_whatsapp !== undefined ? (contact_whatsapp?.trim() || '') : null,
-    status ?? null,
-    id
+     WHERE id = ?`,
+    [
+      title?.trim() ?? null,
+      description?.trim() ?? null,
+      category ?? null,
+      price !== undefined ? 1 : null,
+      price !== undefined ? (price === '' || price == null ? null : Number(price)) : null,
+      currency ?? null,
+      condition_label ?? null,
+      city?.trim() ?? null,
+      country?.trim() ?? null,
+      photos !== undefined ? JSON.stringify(photos) : null,
+      contact_whatsapp !== undefined ? (contact_whatsapp?.trim() || '') : null,
+      status ?? null,
+      id,
+    ]
   );
 
-  const row = db.prepare(
+  const row = await db.get<Record<string, unknown>>(
     `SELECT c.*, u.full_name AS seller_name, u.username AS seller_username, u.avatar_url AS seller_avatar,
             u.is_verified AS seller_verified, ${ratingSubquery()}
-     FROM classifieds c JOIN users u ON u.id = c.seller_id WHERE c.id = ?`
-  ).get(id) as Record<string, unknown>;
-  res.json(mapListing(row));
+     FROM classifieds c JOIN users u ON u.id = c.seller_id WHERE c.id = ?`,
+    [id]
+  );
+  res.json(mapListing(row!));
 });
 
-router.delete('/:id', authMiddleware, (req: AuthRequest, res) => {
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const db = getDb();
-  const existing = db.prepare('SELECT seller_id FROM classifieds WHERE id = ?').get(id) as
-    | { seller_id: string }
-    | undefined;
+  const existing = await db.get<{ seller_id: string }>(
+    'SELECT seller_id FROM classifieds WHERE id = ?',
+    [id]
+  );
   if (!existing) return res.status(404).json({ error: 'Anúncio não encontrado' });
   if (existing.seller_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
-  db.prepare(`UPDATE classifieds SET is_active = 0, status = 'inactive' WHERE id = ?`).run(id);
+  await db.run(`UPDATE classifieds SET is_active = 0, status = 'inactive' WHERE id = ?`, [id]);
   res.json({ ok: true });
 });
 

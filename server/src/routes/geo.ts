@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Country, State, City } from 'country-state-city';
 import { authMiddleware } from '../middleware/auth.js';
-import { getDb } from '../db/database.js';
+import { db } from '../db/sql.js';
 
 const router = Router();
 const OUTROS = 'OUTROS';
@@ -16,28 +16,29 @@ function exploreType(req: { query: Record<string, unknown> }): 'people' | 'busin
 }
 
 /** Países com pessoas ou negócios cadastrados (exceto Brasil) — filtros do Explorar */
-router.get('/used-countries', authMiddleware, (req, res) => {
-  const db = getDb();
+router.get('/used-countries', authMiddleware, async (req, res) => {
   const type = exploreType(req);
 
   const rows = type === 'businesses'
-    ? db.prepare(
+    ? await db.all<{ country_code: string }>(
         `SELECT DISTINCT UPPER(TRIM(country)) AS country_code
          FROM businesses
          WHERE is_active = 1
            AND country IS NOT NULL
            AND TRIM(country) != ''
            AND UPPER(TRIM(country)) != ?
-         ORDER BY country_code`
-      ).all(EXCLUDED_COUNTRY) as Array<{ country_code: string }>
-    : db.prepare(
+         ORDER BY country_code`,
+        [EXCLUDED_COUNTRY]
+      )
+    : await db.all<{ country_code: string }>(
         `SELECT DISTINCT UPPER(TRIM(current_country)) AS country_code
          FROM public_profiles
          WHERE current_country IS NOT NULL
            AND TRIM(current_country) != ''
            AND UPPER(TRIM(current_country)) != ?
-         ORDER BY country_code`
-      ).all(EXCLUDED_COUNTRY) as Array<{ country_code: string }>;
+         ORDER BY country_code`,
+        [EXCLUDED_COUNTRY]
+      );
 
   const countries = rows
     .map((r) => ({ code: r.country_code, name: countryName(r.country_code) }))
@@ -47,84 +48,86 @@ router.get('/used-countries', authMiddleware, (req, res) => {
 });
 
 /** Estados/regiões com cadastros no país selecionado */
-router.get('/used-states', authMiddleware, (req, res) => {
+router.get('/used-states', authMiddleware, async (req, res) => {
   const country = String(req.query.country || '').toUpperCase();
   if (!country) return res.status(400).json({ error: 'País obrigatório' });
   if (country === EXCLUDED_COUNTRY) return res.json([]);
 
-  const db = getDb();
   const type = exploreType(req);
 
   const rows = type === 'businesses'
-    ? db.prepare(
-        `SELECT DISTINCT TRIM(state) AS name
+    ? await db.all<{ name: string }>(
+        `SELECT DISTINCT TRIM(state) AS name, lower(TRIM(state)) AS name_sort
          FROM businesses
          WHERE is_active = 1
            AND UPPER(TRIM(country)) = ?
            AND state IS NOT NULL
            AND TRIM(state) != ''
-         ORDER BY name COLLATE NOCASE`
-      ).all(country) as Array<{ name: string }>
-    : db.prepare(
-        `SELECT DISTINCT TRIM(current_state) AS name
+         ORDER BY name_sort`,
+        [country]
+      )
+    : await db.all<{ name: string }>(
+        `SELECT DISTINCT TRIM(current_state) AS name, lower(TRIM(current_state)) AS name_sort
          FROM public_profiles
          WHERE UPPER(TRIM(current_country)) = ?
            AND current_state IS NOT NULL
            AND TRIM(current_state) != ''
-         ORDER BY name COLLATE NOCASE`
-      ).all(country) as Array<{ name: string }>;
+         ORDER BY name_sort`,
+        [country]
+      );
 
   res.json(rows.map((r) => ({ code: r.name, name: r.name })));
 });
 
 /** Cidades com cadastros no estado/região selecionado */
-router.get('/used-cities', authMiddleware, (req, res) => {
+router.get('/used-cities', authMiddleware, async (req, res) => {
   const country = String(req.query.country || '').toUpperCase();
   const state = String(req.query.state || '').trim();
   if (!country || !state) return res.status(400).json({ error: 'País e estado obrigatórios' });
   if (country === EXCLUDED_COUNTRY) return res.json([]);
 
-  const db = getDb();
   const type = exploreType(req);
 
   const rows = type === 'businesses'
-    ? db.prepare(
-        `SELECT DISTINCT TRIM(city) AS name
+    ? await db.all<{ name: string }>(
+        `SELECT DISTINCT TRIM(city) AS name, lower(TRIM(city)) AS name_sort
          FROM businesses
          WHERE is_active = 1
            AND UPPER(TRIM(country)) = ?
            AND TRIM(state) = ?
            AND city IS NOT NULL
            AND TRIM(city) != ''
-         ORDER BY name COLLATE NOCASE`
-      ).all(country, state) as Array<{ name: string }>
-    : db.prepare(
-        `SELECT DISTINCT TRIM(current_city) AS name
+         ORDER BY name_sort`,
+        [country, state]
+      )
+    : await db.all<{ name: string }>(
+        `SELECT DISTINCT TRIM(current_city) AS name, lower(TRIM(current_city)) AS name_sort
          FROM public_profiles
          WHERE UPPER(TRIM(current_country)) = ?
            AND TRIM(current_state) = ?
            AND current_city IS NOT NULL
            AND TRIM(current_city) != ''
-         ORDER BY name COLLATE NOCASE`
-      ).all(country, state) as Array<{ name: string }>;
+         ORDER BY name_sort`,
+        [country, state]
+      );
 
   res.json(rows.map((r) => ({ code: r.name, name: r.name })));
 });
 
 /** Categorias com negócios cadastrados (exceto Brasil) */
-router.get('/used-categories', authMiddleware, (req, res) => {
+router.get('/used-categories', authMiddleware, async (req, res) => {
   if (exploreType(req) !== 'businesses') return res.json([]);
 
-  const db = getDb();
-  const rows = db.prepare(
-    `SELECT DISTINCT TRIM(category) AS code
+  const rows = await db.all<{ code: string }>(
+    `SELECT DISTINCT TRIM(category) AS code, lower(TRIM(category)) AS code_sort
      FROM businesses
      WHERE is_active = 1
        AND category IS NOT NULL
        AND TRIM(category) != ''
        AND UPPER(TRIM(country)) != ?
-     ORDER BY code COLLATE NOCASE`
-  ).all(EXCLUDED_COUNTRY) as Array<{ code: string }>;
+     ORDER BY code_sort`,
+    [EXCLUDED_COUNTRY]
+  );
 
   res.json(rows.map((r) => ({ code: r.code, name: r.code })));
 });

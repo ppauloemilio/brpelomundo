@@ -1,80 +1,90 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getDb, parseJson } from '../db/database.js';
+import { db } from '../db/sql.js';
+import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest, createNotification } from '../middleware/auth.js';
 import { paramId } from '../lib/params.js';
-import type { Server as SocketServer } from 'socket.io';
-
-let io: SocketServer | null = null;
-
-export function setSocketIO(socketServer: SocketServer) {
-  io = socketServer;
-}
 
 const router = Router();
 
-router.get('/', authMiddleware, (req: AuthRequest, res) => {
-  const db = getDb();
-  const conversations = db.prepare('SELECT * FROM conversations ORDER BY updated_at DESC').all();
-  const mine = conversations.filter((c) => {
-    const participants = parseJson((c as { participant_ids: string }).participant_ids, [] as string[]);
-    return participants.includes(req.user!.id);
-  });
+/**
+ * `participant_ids` guarda um array JSON em TEXT. O operador `@>` do jsonb
+ * filtra as conversas do usuário no banco, em vez de carregar a tabela toda.
+ * (Evitamos o operador `?` do jsonb porque ele colidiria com os placeholders.)
+ */
+const PARTICIPANT_FILTER = `participant_ids::jsonb @> to_jsonb(?::text)`;
 
-  res.json(
-    mine.map((c) => ({
-      ...c,
-      participant_ids: parseJson((c as { participant_ids: string }).participant_ids, []),
-      last_message: parseJson((c as { last_message: string | null }).last_message, null),
-      unread_count: parseJson((c as { unread_count: string }).unread_count, {}),
-    }))
+type ConversationRow = {
+  participant_ids: string;
+  last_message: string | null;
+  unread_count: string;
+  type: string;
+};
+
+function formatConversation(c: ConversationRow) {
+  return {
+    ...c,
+    participant_ids: parseJson(c.participant_ids, [] as string[]),
+    last_message: parseJson(c.last_message, null),
+    unread_count: parseJson(c.unread_count, {}),
+  };
+}
+
+router.get('/', authMiddleware, async (req: AuthRequest, res) => {
+  const mine = await db.all<ConversationRow>(
+    `SELECT * FROM conversations WHERE ${PARTICIPANT_FILTER} ORDER BY updated_at DESC`,
+    [req.user!.id]
   );
+  res.json(mine.map(formatConversation));
 });
 
-router.get('/unread-count', authMiddleware, (req: AuthRequest, res) => {
-  const db = getDb();
-  const conversations = db.prepare('SELECT unread_count, participant_ids FROM conversations').all();
+router.get('/unread-count', authMiddleware, async (req: AuthRequest, res) => {
+  const conversations = await db.all<{ unread_count: string }>(
+    `SELECT unread_count FROM conversations WHERE ${PARTICIPANT_FILTER}`,
+    [req.user!.id]
+  );
   let total = 0;
   for (const c of conversations) {
-    const participants = parseJson((c as { participant_ids: string }).participant_ids, [] as string[]);
-    if (!participants.includes(req.user!.id)) continue;
-    const unread = parseJson((c as { unread_count: string }).unread_count, {} as Record<string, number>);
+    const unread = parseJson(c.unread_count, {} as Record<string, number>);
     total += unread[req.user!.id] || 0;
   }
   res.json({ count: total });
 });
 
-router.post('/', authMiddleware, (req: AuthRequest, res) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   const { participant_ids, type = 'user_user', business_id } = req.body;
   if (!participant_ids?.length) return res.status(400).json({ error: 'Participantes obrigatórios' });
 
   const allParticipants = [...new Set([req.user!.id, ...participant_ids])];
-  const db = getDb();
 
-  const existing = db.prepare('SELECT * FROM conversations').all().find((c) => {
-    const p = parseJson((c as { participant_ids: string }).participant_ids, [] as string[]).sort();
-    const target = [...allParticipants].sort();
-    return JSON.stringify(p) === JSON.stringify(target) && (c as { type: string }).type === type;
-  });
+  const candidates = await db.all<ConversationRow>(
+    `SELECT * FROM conversations WHERE ${PARTICIPANT_FILTER}`,
+    [req.user!.id]
+  );
+  const target = JSON.stringify([...allParticipants].sort());
+  const existing = candidates.find(
+    (c) =>
+      JSON.stringify(parseJson(c.participant_ids, [] as string[]).sort()) === target &&
+      c.type === type
+  );
 
   if (existing) {
-    return res.json({
-      ...existing,
-      participant_ids: parseJson((existing as { participant_ids: string }).participant_ids, []),
-      last_message: parseJson((existing as { last_message: string | null }).last_message, null),
-      unread_count: parseJson((existing as { unread_count: string }).unread_count, {}),
-    });
+    return res.json(formatConversation(existing));
   }
 
   const id = uuid();
   const unread: Record<string, number> = {};
   for (const p of allParticipants) unread[p] = 0;
 
-  db.prepare(
-    'INSERT INTO conversations (id, type, business_id, participant_ids, unread_count) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, type, business_id || null, JSON.stringify(allParticipants), JSON.stringify(unread));
+  await db.run(
+    'INSERT INTO conversations (id, type, business_id, participant_ids, unread_count) VALUES (?, ?, ?, ?, ?)',
+    [id, type, business_id || null, JSON.stringify(allParticipants), JSON.stringify(unread)]
+  );
 
-  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id);
+  const conversation = await db.get<Record<string, unknown>>(
+    'SELECT * FROM conversations WHERE id = ?',
+    [id]
+  );
   res.status(201).json({
     ...conversation,
     participant_ids: allParticipants,
@@ -83,44 +93,46 @@ router.post('/', authMiddleware, (req: AuthRequest, res) => {
   });
 });
 
-router.get('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
+router.get('/:id/messages', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const db = getDb();
-  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as
-    | { participant_ids: string }
-    | undefined;
+  const conversation = await db.get<{ participant_ids: string; unread_count: string }>(
+    'SELECT * FROM conversations WHERE id = ?',
+    [id]
+  );
   if (!conversation) return res.status(404).json({ error: 'Conversa não encontrada' });
 
   const participants = parseJson(conversation.participant_ids, [] as string[]);
   if (!participants.includes(req.user!.id)) return res.status(403).json({ error: 'Sem permissão' });
 
-  const messages = db.prepare(
-    'SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at ASC'
-  ).all(id);
-
-  const unread = parseJson(
-    (db.prepare('SELECT unread_count FROM conversations WHERE id = ?').get(id) as { unread_count: string }).unread_count,
-    {} as Record<string, number>
+  const messages = await db.all<{ is_read: number }>(
+    'SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at ASC',
+    [id]
   );
+
+  const unread = parseJson(conversation.unread_count, {} as Record<string, number>);
   unread[req.user!.id] = 0;
-  db.prepare('UPDATE conversations SET unread_count = ? WHERE id = ?').run(JSON.stringify(unread), id);
+  await db.run('UPDATE conversations SET unread_count = ? WHERE id = ?', [
+    JSON.stringify(unread),
+    id,
+  ]);
 
-  db.prepare(
-    'UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_id != ?'
-  ).run(id, req.user!.id);
+  await db.run('UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_id != ?', [
+    id,
+    req.user!.id,
+  ]);
 
-  res.json(messages.map((m) => ({ ...m, is_read: !!(m as { is_read: number }).is_read })));
+  res.json(messages.map((m) => ({ ...m, is_read: !!m.is_read })));
 });
 
-router.post('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
+router.post('/:id/messages', authMiddleware, async (req: AuthRequest, res) => {
   const conversationId = paramId(req.params.id);
   const { content, attachment_url } = req.body;
   if (!content?.trim()) return res.status(400).json({ error: 'Mensagem vazia' });
 
-  const db = getDb();
-  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) as
-    | { participant_ids: string; unread_count: string }
-    | undefined;
+  const conversation = await db.get<{ participant_ids: string; unread_count: string }>(
+    'SELECT * FROM conversations WHERE id = ?',
+    [conversationId]
+  );
   if (!conversation) return res.status(404).json({ error: 'Conversa não encontrada' });
 
   const participants = parseJson(conversation.participant_ids, [] as string[]);
@@ -128,9 +140,10 @@ router.post('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
 
   const id = uuid();
   const now = new Date().toISOString();
-  db.prepare(
-    'INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, conversationId, req.user!.id, content.trim(), attachment_url || null);
+  await db.run(
+    'INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url) VALUES (?, ?, ?, ?, ?)',
+    [id, conversationId, req.user!.id, content.trim(), attachment_url || null]
+  );
 
   const lastMessage = { id, content: content.trim(), sender_id: req.user!.id, created_at: now };
   const unread = parseJson(conversation.unread_count, {} as Record<string, number>);
@@ -138,16 +151,21 @@ router.post('/:id/messages', authMiddleware, (req: AuthRequest, res) => {
     if (p !== req.user!.id) unread[p] = (unread[p] || 0) + 1;
   }
 
-  db.prepare('UPDATE conversations SET last_message = ?, unread_count = ?, updated_at = ? WHERE id = ?').run(
-    JSON.stringify(lastMessage), JSON.stringify(unread), now, conversationId
+  await db.run(
+    'UPDATE conversations SET last_message = ?, unread_count = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(lastMessage), JSON.stringify(unread), now, conversationId]
   );
 
-  const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+  const message = await db.get<Record<string, unknown>>(
+    'SELECT * FROM messages WHERE id = ?',
+    [id]
+  );
   for (const p of participants) {
-    if (p !== req.user!.id) createNotification(p, req.user!.id, 'message', 'conversation', conversationId);
+    if (p !== req.user!.id) {
+      await createNotification(p, req.user!.id, 'message', 'conversation', conversationId);
+    }
   }
 
-  io?.to(conversationId).emit('new_message', message);
   res.status(201).json({ ...message, is_read: false });
 });
 

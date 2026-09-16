@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { io } from 'socket.io-client';
-import { api, getApiBase } from '@/lib/api';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -33,15 +32,18 @@ export function MessagesPage() {
   const [text, setText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Sem WebSocket: a API roda como função serverless, então buscamos por intervalo.
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => api<Conversation[]>('/conversations'),
+    refetchInterval: 15_000,
   });
 
   const { data: messages = [] } = useQuery({
     queryKey: ['messages', activeId],
     queryFn: () => api<Message[]>(`/conversations/${activeId}/messages`),
     enabled: !!activeId,
+    refetchInterval: 5_000,
   });
 
   const sendMutation = useMutation({
@@ -52,17 +54,6 @@ export function MessagesPage() {
       qc.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
-
-  useEffect(() => {
-    if (!activeId) return;
-    const base = getApiBase();
-    const socket = base ? io(base, { path: '/socket.io' }) : io({ path: '/socket.io' });
-    socket.emit('join_conversation', activeId);
-    socket.on('new_message', () => {
-      qc.invalidateQueries({ queryKey: ['messages', activeId] });
-    });
-    return () => { socket.disconnect(); };
-  }, [activeId, qc]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

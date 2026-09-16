@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getDb, parseJson, userSnapshot, UserRow } from '../db/database.js';
-import { authMiddleware, AuthRequest, createNotification } from '../middleware/auth.js';
+import { db } from '../db/sql.js';
+import { parseJson } from '../db/database.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { paramId } from '../lib/params.js';
 
 const router = Router();
@@ -24,8 +25,7 @@ function mapBusinessRow(b: Record<string, unknown>) {
   };
 }
 
-router.get('/', authMiddleware, (req, res) => {
-  const db = getDb();
+router.get('/', authMiddleware, async (req, res) => {
   const country = (req.query.country as string)?.trim();
   const category = (req.query.category as string)?.trim();
   const state = (req.query.state as string)?.trim();
@@ -44,95 +44,100 @@ router.get('/', authMiddleware, (req, res) => {
     params.push(category);
   }
   if (state) {
-    conditions.push('(state = ? OR (TRIM(COALESCE(state, "")) = "" AND address LIKE ?))');
+    conditions.push(`(state = ? OR (TRIM(COALESCE(state, '')) = '' AND address ILIKE ?))`);
     params.push(state, `%${state}%`);
   }
   if (city) {
-    conditions.push('(city = ? OR (TRIM(COALESCE(city, "")) = "" AND address LIKE ?))');
+    conditions.push(`(city = ? OR (TRIM(COALESCE(city, '')) = '' AND address ILIKE ?))`);
     params.push(city, `%${city}%`);
   }
   if (q) {
-    conditions.push('(name LIKE ? OR category LIKE ? OR address LIKE ?)');
+    conditions.push('(name ILIKE ? OR category ILIKE ? OR address ILIKE ?)');
     params.push(`%${q}%`, `%${q}%`, `%${q}%`);
   }
 
-  const businesses = db.prepare(
+  const businesses = await db.all<Record<string, unknown>>(
     `SELECT b.*,
        (SELECT ROUND(AVG(r.rating), 1) FROM reviews r WHERE r.target_type = 'business' AND r.target_id = b.id AND r.is_active = 1) AS rating_avg,
        (SELECT COUNT(*) FROM reviews r WHERE r.target_type = 'business' AND r.target_id = b.id AND r.is_active = 1) AS rating_count
      FROM businesses b WHERE ${conditions.join(' AND ')}
      ORDER BY
-       CASE WHEN is_featured = 1 AND (featured_until IS NULL OR featured_until >= datetime('now')) THEN 0 ELSE 1 END,
+       CASE WHEN is_featured = 1 AND (featured_until IS NULL OR featured_until >= utc_now()) THEN 0 ELSE 1 END,
        featured_order ASC,
        created_at DESC
-     LIMIT 100`
-  ).all(...params);
+     LIMIT 100`,
+    params
+  );
 
-  res.json(businesses.map((b) => mapBusinessRow(b as Record<string, unknown>)));
+  res.json(businesses.map(mapBusinessRow));
 });
 
-router.get('/mine', authMiddleware, (req: AuthRequest, res) => {
-  const db = getDb();
-  const businesses = db.prepare('SELECT * FROM businesses WHERE owner_id = ? ORDER BY created_at DESC').all(req.user!.id);
+router.get('/mine', authMiddleware, async (req: AuthRequest, res) => {
+  const businesses = await db.all<{ skills: string; photos: string; social_links: string }>(
+    'SELECT * FROM businesses WHERE owner_id = ? ORDER BY created_at DESC',
+    [req.user!.id]
+  );
   res.json(
     businesses.map((b) => ({
       ...b,
-      skills: parseJson((b as { skills: string }).skills, []),
-      photos: parseJson((b as { photos: string }).photos, []),
-      social_links: parseJson((b as { social_links: string }).social_links, {}),
+      skills: parseJson(b.skills, []),
+      photos: parseJson(b.photos, []),
+      social_links: parseJson(b.social_links, {}),
     }))
   );
 });
 
-router.get('/:id', authMiddleware, (req, res) => {
-  const db = getDb();
+router.get('/:id', authMiddleware, async (req, res) => {
   const id = paramId(req.params.id);
-  const row = db.prepare(
+  const row = await db.get<Record<string, unknown>>(
     `SELECT b.*, u.full_name AS owner_name, u.username AS owner_username, u.avatar_url AS owner_avatar_url,
             (SELECT ROUND(AVG(r.rating), 1) FROM reviews r WHERE r.target_type = 'business' AND r.target_id = b.id AND r.is_active = 1) AS rating_avg,
             (SELECT COUNT(*) FROM reviews r WHERE r.target_type = 'business' AND r.target_id = b.id AND r.is_active = 1) AS rating_count
      FROM businesses b
      JOIN users u ON u.id = b.owner_id
-     WHERE b.id = ? AND b.is_active = 1`
-  ).get(id);
+     WHERE b.id = ? AND b.is_active = 1`,
+    [id]
+  );
   if (!row) return res.status(404).json({ error: 'Negócio não encontrado' });
-  res.json(mapBusinessRow(row as Record<string, unknown>));
+  res.json(mapBusinessRow(row));
 });
 
-router.post('/', authMiddleware, (req: AuthRequest, res) => {
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   const { name, category, country, latitude, longitude, address, state, city, tagline, description, skills = [], photos = [], social_links = {} } = req.body;
   if (!name || !category || !country) return res.status(400).json({ error: 'Campos obrigatórios faltando' });
 
   const id = uuid();
-  const db = getDb();
-  db.prepare(
+  await db.run(
     `INSERT INTO businesses (id, name, category, country, owner_id, latitude, longitude, address, state, city, tagline, description, skills, photos, social_links)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id, name, category, country, req.user!.id,
-    latitude ?? null, longitude ?? null, address || '', state || '', city || '',
-    tagline || '', description || '',
-    JSON.stringify(skills), JSON.stringify(photos), JSON.stringify(social_links)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id, name, category, country, req.user!.id,
+      latitude ?? null, longitude ?? null, address || '', state || '', city || '',
+      tagline || '', description || '',
+      JSON.stringify(skills), JSON.stringify(photos), JSON.stringify(social_links),
+    ]
   );
 
-  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id);
+  const business = await db.get<{ skills: string; photos: string; social_links: string }>(
+    'SELECT * FROM businesses WHERE id = ?',
+    [id]
+  );
   res.status(201).json({
     ...business,
-    skills: parseJson((business as { skills: string }).skills, []),
-    photos: parseJson((business as { photos: string }).photos, []),
-    social_links: parseJson((business as { social_links: string }).social_links, {}),
+    skills: parseJson(business!.skills, []),
+    photos: parseJson(business!.photos, []),
+    social_links: parseJson(business!.social_links, {}),
   });
 });
 
-router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
+router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const db = getDb();
-  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id) as { owner_id: string } | undefined;
+  const business = await db.get<{ owner_id: string }>('SELECT * FROM businesses WHERE id = ?', [id]);
   if (!business) return res.status(404).json({ error: 'Negócio não encontrado' });
   if (business.owner_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
 
   const { name, category, country, latitude, longitude, address, state, city, tagline, description, skills, photos, social_links, is_active } = req.body;
-  db.prepare(
+  await db.run(
     `UPDATE businesses SET
      name = COALESCE(?, name),
      category = COALESCE(?, category),
@@ -148,34 +153,37 @@ router.patch('/:id', authMiddleware, (req: AuthRequest, res) => {
      photos = COALESCE(?, photos),
      social_links = COALESCE(?, social_links),
      is_active = COALESCE(?, is_active)
-     WHERE id = ?`
-  ).run(
-    name ?? null, category ?? null, country ?? null,
-    latitude ?? null, longitude ?? null, address ?? null,
-    state ?? null, city ?? null, tagline ?? null, description ?? null,
-    skills ? JSON.stringify(skills) : null,
-    photos ? JSON.stringify(photos) : null,
-    social_links ? JSON.stringify(social_links) : null,
-    is_active ?? null,
-    id
+     WHERE id = ?`,
+    [
+      name ?? null, category ?? null, country ?? null,
+      latitude ?? null, longitude ?? null, address ?? null,
+      state ?? null, city ?? null, tagline ?? null, description ?? null,
+      skills ? JSON.stringify(skills) : null,
+      photos ? JSON.stringify(photos) : null,
+      social_links ? JSON.stringify(social_links) : null,
+      is_active ?? null,
+      id,
+    ]
   );
 
-  const updated = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id);
+  const updated = await db.get<{ skills: string; photos: string; social_links: string }>(
+    'SELECT * FROM businesses WHERE id = ?',
+    [id]
+  );
   res.json({
     ...updated,
-    skills: parseJson((updated as { skills: string }).skills, []),
-    photos: parseJson((updated as { photos: string }).photos, []),
-    social_links: parseJson((updated as { social_links: string }).social_links, {}),
+    skills: parseJson(updated!.skills, []),
+    photos: parseJson(updated!.photos, []),
+    social_links: parseJson(updated!.social_links, {}),
   });
 });
 
-router.delete('/:id', authMiddleware, (req: AuthRequest, res) => {
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const db = getDb();
-  const business = db.prepare('SELECT * FROM businesses WHERE id = ?').get(id) as { owner_id: string } | undefined;
+  const business = await db.get<{ owner_id: string }>('SELECT * FROM businesses WHERE id = ?', [id]);
   if (!business) return res.status(404).json({ error: 'Negócio não encontrado' });
   if (business.owner_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
-  db.prepare('UPDATE businesses SET is_active = 0 WHERE id = ?').run(id);
+  await db.run('UPDATE businesses SET is_active = 0 WHERE id = ?', [id]);
   res.json({ ok: true });
 });
 

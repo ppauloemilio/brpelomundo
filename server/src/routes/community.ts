@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { Country } from 'country-state-city';
-import { getDb, parseJson } from '../db/database.js';
+import { db } from '../db/sql.js';
+import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { isPremiumProfile } from '../lib/settings.js';
+import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
 
 const router = Router();
 const EXCLUDED = 'BR';
@@ -13,16 +14,19 @@ function countryName(code: string): string {
 
 type CountryRow = { country_code: string; people_count: number; business_count: number };
 
-router.get('/', authMiddleware, (req: AuthRequest, res) => {
-  const db = getDb();
+router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   const filterCountry = (req.query.country as string)?.trim().toUpperCase() || '';
 
-  const meProfile = db.prepare(
-    'SELECT current_country FROM public_profiles WHERE user_id = ?'
-  ).get(req.user!.id) as { current_country: string } | undefined;
+  const [settings, meProfile] = await Promise.all([
+    getMonetizationSettings(),
+    db.get<{ current_country: string }>(
+      'SELECT current_country FROM public_profiles WHERE user_id = ?',
+      [req.user!.id]
+    ),
+  ]);
   const currentCountry = (meProfile?.current_country || '').toUpperCase();
 
-  const countryStats = db.prepare(
+  const countryStats = await db.all<CountryRow>(
     `SELECT country_code,
             SUM(people_count) AS people_count,
             SUM(business_count) AS business_count
@@ -41,10 +45,11 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
          AND TRIM(country) != ''
          AND UPPER(TRIM(country)) != ?
        GROUP BY UPPER(TRIM(country))
-     )
+     ) AS stats
      GROUP BY country_code
-     ORDER BY (people_count + business_count) DESC, country_code`
-  ).all(EXCLUDED, EXCLUDED) as CountryRow[];
+     ORDER BY (SUM(people_count) + SUM(business_count)) DESC, country_code`,
+    [EXCLUDED, EXCLUDED]
+  );
 
   const peopleTotal = countryStats.reduce((s, c) => s + c.people_count, 0);
   const businessTotal = countryStats.reduce((s, c) => s + c.business_count, 0);
@@ -55,61 +60,64 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
     ? countryStats.filter((c) => c.country_code === filterCountry)
     : countryStats;
 
-  const countries = visibleCountries.map((c) => {
-    const users = db.prepare(
-      `SELECT u.id, u.full_name, u.username, u.avatar_url,
-              p.bio, p.current_country, p.current_city, p.primary_skill,
-              p.show_city_on_profile, p.is_premium, p.premium_until,
-              CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END AS is_following
-       FROM users u
-       JOIN public_profiles p ON p.user_id = u.id
-       LEFT JOIN follows f ON f.follower_id = ? AND f.following_id = u.id
-       WHERE UPPER(TRIM(p.current_country)) = ?
-         AND UPPER(TRIM(p.current_country)) != ?
-       ORDER BY
-         CASE WHEN p.is_premium = 1 AND (p.premium_until IS NULL OR p.premium_until >= datetime('now')) THEN 0 ELSE 1 END,
-         u.full_name ASC`
-    ).all(req.user!.id, c.country_code, EXCLUDED) as Array<{
-      id: string;
-      full_name: string;
-      username: string;
-      avatar_url: string | null;
-      bio: string;
-      current_country: string;
-      current_city: string;
-      primary_skill: string;
-      show_city_on_profile: number;
-      is_premium: number;
-      premium_until: string | null;
-      is_following: number;
-    }>;
-
-    const businesses = db.prepare(
-      `SELECT b.id, b.name, b.category, b.tagline, b.description, b.address, b.city, b.state, b.country,
-              b.latitude, b.longitude, b.skills,
-              u.id AS owner_id, u.full_name AS owner_name
-       FROM businesses b
-       JOIN users u ON u.id = b.owner_id
-       WHERE b.is_active = 1
-         AND UPPER(TRIM(b.country)) = ?
-         AND UPPER(TRIM(b.country)) != ?
-       ORDER BY b.name ASC`
-    ).all(c.country_code, EXCLUDED) as Array<{
-      id: string;
-      name: string;
-      category: string;
-      tagline: string;
-      description: string;
-      address: string;
-      city: string;
-      state: string;
-      country: string;
-      latitude: number | null;
-      longitude: number | null;
-      owner_id: string;
-      owner_name: string;
-      skills: string;
-    }>;
+  const countries = await Promise.all(visibleCountries.map(async (c) => {
+    const [users, businesses] = await Promise.all([
+      db.all<{
+        id: string;
+        full_name: string;
+        username: string;
+        avatar_url: string | null;
+        bio: string;
+        current_country: string;
+        current_city: string;
+        primary_skill: string;
+        show_city_on_profile: number;
+        is_premium: number;
+        premium_until: string | null;
+        is_following: number;
+      }>(
+        `SELECT u.id, u.full_name, u.username, u.avatar_url,
+                p.bio, p.current_country, p.current_city, p.primary_skill,
+                p.show_city_on_profile, p.is_premium, p.premium_until,
+                CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END AS is_following
+         FROM users u
+         JOIN public_profiles p ON p.user_id = u.id
+         LEFT JOIN follows f ON f.follower_id = ? AND f.following_id = u.id
+         WHERE UPPER(TRIM(p.current_country)) = ?
+           AND UPPER(TRIM(p.current_country)) != ?
+         ORDER BY
+           CASE WHEN p.is_premium = 1 AND (p.premium_until IS NULL OR p.premium_until >= utc_now()) THEN 0 ELSE 1 END,
+           u.full_name ASC`,
+        [req.user!.id, c.country_code, EXCLUDED]
+      ),
+      db.all<{
+        id: string;
+        name: string;
+        category: string;
+        tagline: string;
+        description: string;
+        address: string;
+        city: string;
+        state: string;
+        country: string;
+        latitude: number | null;
+        longitude: number | null;
+        owner_id: string;
+        owner_name: string;
+        skills: string;
+      }>(
+        `SELECT b.id, b.name, b.category, b.tagline, b.description, b.address, b.city, b.state, b.country,
+                b.latitude, b.longitude, b.skills,
+                u.id AS owner_id, u.full_name AS owner_name
+         FROM businesses b
+         JOIN users u ON u.id = b.owner_id
+         WHERE b.is_active = 1
+           AND UPPER(TRIM(b.country)) = ?
+           AND UPPER(TRIM(b.country)) != ?
+         ORDER BY b.name ASC`,
+        [c.country_code, EXCLUDED]
+      ),
+    ]);
 
     return {
       code: c.country_code,
@@ -119,7 +127,7 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
       users: users.map((u) => ({
         ...u,
         is_following: !!u.is_following,
-        is_premium: isPremiumProfile(u),
+        is_premium: isPremiumProfile(settings, u),
         current_city: u.show_city_on_profile ? u.current_city : '',
       })),
       businesses: businesses.map((b) => ({
@@ -139,7 +147,7 @@ router.get('/', authMiddleware, (req: AuthRequest, res) => {
         skills: parseJson(b.skills, [] as string[]),
       })),
     };
-  });
+  }));
 
   res.json({
     stats: {
