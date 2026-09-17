@@ -13,6 +13,7 @@
     "db:check": "tsx scripts/check-connection.ts",
     "smoke": "tsx scripts/smoke.ts",
     "check:data": "tsx scripts/check-data.ts",
+    "check:prod": "tsx scripts/verify-prod.ts",
     "check:schema": "tsx scripts/check-schema-split.ts",
     "test": "tsx src/db/sql.test.ts && tsx scripts/check-schema-split.ts"
   },
