@@ -2,14 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ImagePlus, MapPin, X } from 'lucide-react';
-import { api, assetUrl, uploadFile } from '@/lib/api';
+import { ArrowLeft, ImagePlus, MapPin } from 'lucide-react';
+import { api, uploadFile } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PostFormatToolbar } from '@/components/post/PostFormatToolbar';
-import { FormattedText } from '@/lib/formatPostText';
+import { PostImageControls } from '@/components/post/PostImageControls';
+import {
+  FormattedText,
+  buildImageToken,
+  findInlineImages,
+  insertImageToken,
+} from '@/lib/formatPostText';
 import { useCountryNameMap } from '@/components/explore/ExploreGeoFilters';
 import { COUNTRY_LABELS } from '@/lib/utils';
 type PostTypeOption = 'text' | 'job' | 'event';
@@ -43,8 +49,10 @@ export function CreatePostPage() {
 
   const [content, setContent] = useState('');
   const [postType, setPostType] = useState<PostTypeOption>('text');
-  const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  /** Onde o cursor estava quando o usuário pediu a imagem: o seletor de arquivo rouba o foco. */
+  const cursorRef = useRef(0);
 
   useEffect(() => {
     const param = searchParams.get('type');
@@ -59,6 +67,8 @@ export function CreatePostPage() {
 
   const mutation = useMutation({
     mutationFn: () => {
+      // As imagens vivem nos marcadores do texto; `images` é derivado deles.
+      const images = findInlineImages(content).map((img) => img.url);
       const type = images.length > 0 && postType === 'text' ? 'image' : postType;
       return api('/posts', {
         method: 'POST',
@@ -71,13 +81,31 @@ export function CreatePostPage() {
     },
   });
 
+  const openFilePicker = () => {
+    const el = textareaRef.current;
+    cursorRef.current = el ? el.selectionStart : content.length;
+    setUploadError('');
+    fileRef.current?.click();
+  };
+
   const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadError('');
     try {
       const { url } = await uploadFile(file);
-      setImages((prev) => [...prev, url]);
+      const at = Math.min(cursorRef.current, content.length);
+      const { value, cursor } = insertImageToken(content, at, buildImageToken(url));
+      setContent(value);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(cursor, cursor);
+      });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : t('post.imageUploadFailed'));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -152,38 +180,26 @@ export function CreatePostPage() {
             {content.trim() && (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 px-3 py-2">
                 <p className="mb-1 text-xs font-medium text-slate-500">{t('post.preview')}</p>
-                <p className="text-sm leading-relaxed text-slate-800">
-                  <FormattedText text={content} />
-                </p>
+                <FormattedText text={content} className="text-sm leading-relaxed text-slate-800" />
               </div>
             )}
           </div>
-          {images.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {images.map((url) => (
-                <div key={url} className="relative h-24 w-24 overflow-hidden rounded-lg border border-slate-200">
-                  <img src={assetUrl(url) ?? url} alt="" className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setImages((prev) => prev.filter((u) => u !== url))}
-                    className="absolute right-1 top-1 rounded-full bg-black/50 p-0.5 text-white"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
+
+          <PostImageControls content={content} onChange={setContent} />
+
+          {uploadError && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{uploadError}</p>
           )}
 
           <div className="flex items-center justify-between border-t border-slate-100 pt-4">
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
+              onClick={openFilePicker}
               disabled={uploading}
               className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-brand-700 disabled:opacity-50"
             >
               <ImagePlus className="h-5 w-5" />
-              {uploading ? t('common.loading') : t('post.addPhoto')}
+              {uploading ? t('common.loading') : t('post.insertPhotoAtCursor')}
             </button>
             <input
               ref={fileRef}

@@ -3,7 +3,7 @@ import multer from 'multer';
 import { db } from '../db/sql.js';
 import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-import { saveUpload } from '../lib/uploads.js';
+import { saveUpload, UploadNotConfiguredError } from '../lib/uploads.js';
 import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
 
 const upload = multer({
@@ -221,8 +221,15 @@ router.get('/feed/sidebar', authMiddleware, async (req: AuthRequest, res) => {
 
 router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Arquivo obrigatório' });
-  const url = await saveUpload(req.file);
-  res.json({ url });
+  try {
+    const url = await saveUpload(req.file);
+    res.json({ url });
+  } catch (err) {
+    if (err instanceof UploadNotConfiguredError) {
+      return res.status(503).json({ error: err.message });
+    }
+    throw err;
+  }
 });
 
 router.get('/health', (_req, res) => {

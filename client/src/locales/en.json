@@ -272,6 +272,16 @@
     "linkUrl": "Link URL",
     "preview": "Preview",
     "addPhoto": "Add photo",
+    "insertPhotoAtCursor": "Insert photo in text",
+    "imageSettings": "Images in the text",
+    "imageNumber": "Image {{number}}",
+    "imageWidth": "Width",
+    "imageAlignLeft": "Left, text alongside",
+    "imageAlignCenter": "Centered",
+    "imageAlignRight": "Right, text alongside",
+    "imageAlignFull": "Full width",
+    "imageRemove": "Remove image",
+    "imageUploadFailed": "Could not upload the image.",
     "publish": "Publish"
   },
   "business": {

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Textarea';
 import { timeAgo, COUNTRY_LABELS } from '@/lib/utils';
-import { FormattedText } from '@/lib/formatPostText';
+import { FormattedText, findInlineImages, truncateContent } from '@/lib/formatPostText';
 import { useAuth } from '@/hooks/useAuth';
 
 export type Post = {
@@ -40,7 +40,14 @@ export function PostCard({ post }: { post: Post }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isLong = post.content.length > COLLAPSE_LEN;
-  const displayContent = expanded || !isLong ? post.content : `${post.content.slice(0, COLLAPSE_LEN)}...`;
+  const displayContent = expanded || !isLong
+    ? post.content
+    : `${truncateContent(post.content, COLLAPSE_LEN)}...`;
+
+  // Imagens posicionadas no texto já são renderizadas ali; a galeria fica só
+  // com as que não têm marcador (posts antigos, ou anexadas sem posição).
+  const inlineUrls = new Set(findInlineImages(post.content).map((img) => img.url));
+  const galleryImages = (post.images ?? []).filter((url) => !inlineUrls.has(url));
   const snap = post.author_snapshot;
   const authorPremium = post.author_is_premium ?? snap.is_premium;
   const locationLabel = snap.city
@@ -136,9 +143,9 @@ export function PostCard({ post }: { post: Post }) {
           )}
         </div>
 
-        {post.images?.length > 0 && (
+        {galleryImages.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-slate-100">
-            {post.images.map((img) => (
+            {galleryImages.map((img) => (
               <img key={img} src={assetUrl(img) ?? img} alt="" className="max-h-96 w-full object-cover" />
             ))}
           </div>

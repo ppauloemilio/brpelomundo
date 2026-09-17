@@ -1,4 +1,89 @@
 import type { ReactNode } from 'react';
+import { assetUrl } from '@/lib/api';
+
+export type ImageAlign = 'left' | 'center' | 'right' | 'full';
+
+export const IMAGE_ALIGNS: ImageAlign[] = ['left', 'center', 'right', 'full'];
+
+/**
+ * Imagem no meio do texto: `![alinhamento|largura](url)` em uma linha própria.
+ * Fica legível no textarea e reaproveita o parser de blocos que já existia, em
+ * vez de introduzir HTML no conteúdo (que abriria espaço para XSS).
+ */
+const IMAGE_LINE = /^!\[(left|center|right|full)\|(\d{1,3})\]\(([^\s)]+)\)$/;
+const IMAGE_TOKEN_GLOBAL = /!\[(left|center|right|full)\|(\d{1,3})\]\(([^\s)]+)\)/g;
+
+export type InlineImage = {
+  url: string;
+  align: ImageAlign;
+  width: number;
+  /** Posição do marcador no texto, para poder reescrever só ele. */
+  start: number;
+  end: number;
+};
+
+export function buildImageToken(url: string, align: ImageAlign = 'center', width = 100) {
+  return `![${align}|${clampWidth(width)}](${url})`;
+}
+
+function clampWidth(width: number) {
+  return Math.min(100, Math.max(10, Math.round(width)));
+}
+
+/** Todas as imagens inline do conteúdo, na ordem em que aparecem. */
+export function findInlineImages(content: string): InlineImage[] {
+  const found: InlineImage[] = [];
+  for (const m of content.matchAll(IMAGE_TOKEN_GLOBAL)) {
+    found.push({
+      align: m[1] as ImageAlign,
+      width: clampWidth(Number(m[2])),
+      url: m[3],
+      start: m.index,
+      end: m.index + m[0].length,
+    });
+  }
+  return found;
+}
+
+/** Substitui um marcador específico (por posição) preservando o resto do texto. */
+export function replaceInlineImage(
+  content: string,
+  image: InlineImage,
+  patch: Partial<Pick<InlineImage, 'align' | 'width'>>
+) {
+  const token = buildImageToken(image.url, patch.align ?? image.align, patch.width ?? image.width);
+  return content.slice(0, image.start) + token + content.slice(image.end);
+}
+
+export function removeInlineImage(content: string, image: InlineImage) {
+  const before = content.slice(0, image.start).replace(/\n+$/, '');
+  const after = content.slice(image.end).replace(/^\n+/, '');
+  if (!before) return after;
+  if (!after) return before;
+  return `${before}\n\n${after}`;
+}
+
+/** Insere o marcador em linha própria na posição do cursor. */
+export function insertImageToken(content: string, cursor: number, token: string) {
+  const before = content.slice(0, cursor);
+  const after = content.slice(cursor);
+  const prefix = before && !before.endsWith('\n') ? '\n\n' : '';
+  const suffix = after && !after.startsWith('\n') ? '\n\n' : '';
+  const inserted = `${prefix}${token}${suffix}`;
+  return {
+    value: before + inserted + after,
+    cursor: cursor + inserted.length,
+  };
+}
+
+/** Corta o texto sem partir um marcador de imagem no meio. */
+export function truncateContent(content: string, limit: number) {
+  if (content.length <= limit) return content;
+  const straddling = findInlineImages(content).find(
+    (img) => img.start < limit && img.end > limit
+  );
+  return content.slice(0, straddling ? straddling.start : limit);
+}
 
 type MatchRule = {
   regex: RegExp;
@@ -81,6 +166,7 @@ type Block =
   | { type: 'quote'; text: string }
   | { type: 'ul'; items: string[] }
   | { type: 'ol'; items: string[] }
+  | { type: 'image'; url: string; align: ImageAlign; width: number }
   | { type: 'p'; text: string };
 
 function parseBlocks(text: string): Block[] {
@@ -90,6 +176,18 @@ function parseBlocks(text: string): Block[] {
 
   while (i < lines.length) {
     const line = lines[i];
+
+    const image = IMAGE_LINE.exec(line.trim());
+    if (image) {
+      blocks.push({
+        type: 'image',
+        align: image[1] as ImageAlign,
+        width: clampWidth(Number(image[2])),
+        url: image[3],
+      });
+      i += 1;
+      continue;
+    }
 
     if (line.startsWith('## ')) {
       blocks.push({ type: 'heading', text: line.slice(3) });
@@ -138,13 +236,39 @@ function parseBlocks(text: string): Block[] {
   return blocks;
 }
 
+/** `left`/`right` flutuam para o texto correr ao lado; `center`/`full` ocupam a linha. */
+function imageBlockClass(align: ImageAlign) {
+  switch (align) {
+    case 'left':
+      return 'float-left mr-3 mb-2 max-w-[70%]';
+    case 'right':
+      return 'float-right ml-3 mb-2 max-w-[70%]';
+    case 'center':
+      return 'mx-auto my-2';
+    default:
+      return 'my-2';
+  }
+}
+
 export function FormattedText({ text, className }: { text: string; className?: string }) {
   const blocks = parseBlocks(text);
+  const hasFloat = blocks.some((b) => b.type === 'image' && (b.align === 'left' || b.align === 'right'));
 
   return (
     <div className={className}>
       {blocks.map((block, i) => {
         switch (block.type) {
+          case 'image':
+            return (
+              <span key={i} className={`block ${imageBlockClass(block.align)}`} style={{ width: `${block.width}%` }}>
+                <img
+                  src={assetUrl(block.url) ?? block.url}
+                  alt=""
+                  loading="lazy"
+                  className="w-full rounded-xl border border-slate-100"
+                />
+              </span>
+            );
           case 'heading':
             return (
               <p key={i} className="mb-1 text-base font-bold text-slate-900">
@@ -184,6 +308,8 @@ export function FormattedText({ text, className }: { text: string; className?: s
             );
         }
       })}
+      {/* Encerra os floats para a imagem não vazar do card. */}
+      {hasFloat && <span className="block clear-both" />}
     </div>
   );
 }
