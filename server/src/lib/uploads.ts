@@ -13,18 +13,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const uploadsDir = path.join(__dirname, '../uploads');
 
 /**
- * O nome padrão é BLOB_READ_WRITE_TOKEN, mas a Vercel permite escolher um
- * prefixo ao conectar o store, e aí a variável vem como <PREFIXO>_READ_WRITE_TOKEN.
+ * Duas formas de autenticar no Blob, resolvidas pelo próprio SDK:
+ * OIDC (BLOB_STORE_ID + VERCEL_OIDC_TOKEN, padrão na Vercel desde 2026) ou um
+ * BLOB_READ_WRITE_TOKEN estático, usado fora da Vercel. Basta um dos dois.
  */
-function resolveBlobToken(): string | undefined {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
-  const key = Object.keys(process.env).find((k) => k.endsWith('READ_WRITE_TOKEN'));
-  return key ? process.env[key] : undefined;
-}
-
-const blobToken = resolveBlobToken();
-
-export const blobEnabled = !!blobToken;
+export const blobEnabled = !!(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
 
 /** Na Vercel o filesystem é somente leitura, então o fallback de disco não existe. */
 const isServerless = !!process.env.VERCEL;
@@ -33,9 +26,9 @@ const isServerless = !!process.env.VERCEL;
 export class UploadNotConfiguredError extends Error {
   constructor() {
     super(
-      'Armazenamento de imagens indisponível: nenhum token de Blob encontrado neste deploy. ' +
-        'Conecte um Blob Store ao projeto na Vercel (Storage) e faça um novo deploy, ' +
-        'porque as variáveis de ambiente só entram em deploys criados depois da conexão.'
+      'Armazenamento de imagens indisponível: nenhum Blob Store conectado a este deploy. ' +
+        'Conecte um store na Vercel (Storage) e faça um novo deploy, porque as variáveis ' +
+        'de ambiente só entram em deploys criados depois da conexão.'
     );
     this.name = 'UploadNotConfiguredError';
   }
@@ -51,11 +44,12 @@ export type UploadedFile = {
 export async function saveUpload(file: UploadedFile): Promise<string> {
   const filename = `${uuid()}${path.extname(file.originalname)}`;
 
-  if (blobToken) {
+  if (blobEnabled) {
+    // Sem repassar credenciais: o SDK lê o OIDC (rotacionado pela Vercel) ou o
+    // token estático do ambiente. A documentação alerta para não manuseá-los.
     const { url } = await put(`uploads/${filename}`, file.buffer, {
       access: 'public',
       contentType: file.mimetype,
-      token: blobToken,
     });
     return url;
   }

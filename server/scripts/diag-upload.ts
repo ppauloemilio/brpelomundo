@@ -23,5 +23,18 @@ const res = await fetch(`${base}/api/upload`, {
 });
 
 console.log(`POST /api/upload -> ${res.status} ${res.headers.get('x-vercel-error') ?? ''}`);
-console.log(`content-type: ${res.headers.get('content-type')}`);
-console.log((await res.text()).slice(0, 800));
+const body = await res.text();
+console.log(body.slice(0, 800));
+
+if (!res.ok) process.exit(1);
+
+// O que realmente importa para o feed: a imagem tem de abrir sem autenticação.
+const { url } = JSON.parse(body) as { url: string };
+console.log(`url: ${url}`);
+const fetched = await fetch(url);
+console.log(
+  `GET da imagem (anônimo) -> ${fetched.status} ${fetched.headers.get('content-type')} ` +
+    `${fetched.headers.get('content-length') ?? '?'} bytes`
+);
+console.log(fetched.ok ? 'OK: imagem pública, o feed consegue exibir' : 'FALHA: imagem não é pública');
+

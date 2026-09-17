@@ -228,7 +228,11 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
     if (err instanceof UploadNotConfiguredError) {
       return res.status(503).json({ error: err.message });
     }
-    throw err;
+    // Falha do armazenamento, não do app: o motivo (ex.: store privado, cota)
+    // é acionável para quem administra, e some nos logs se não for devolvido.
+    const reason = err instanceof Error ? err.message : 'erro desconhecido';
+    console.error('Falha ao enviar imagem para o Blob:', err);
+    res.status(502).json({ error: `Falha ao salvar a imagem: ${reason}` });
   }
 });
 
