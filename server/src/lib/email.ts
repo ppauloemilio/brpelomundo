@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+/** Sem a barra final, senão os links saem com `//` e a rota não casa no SPA. */
+const APP_URL = (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = process.env.SMTP_USER;

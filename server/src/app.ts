@@ -24,7 +24,8 @@ function resolveCorsOrigin(): boolean | string | string[] {
     ...(process.env.CORS_ORIGIN?.split(',') ?? []),
     process.env.APP_URL ?? '',
   ]
-    .map((s) => s.trim())
+    // A barra final quebraria a comparação: o header Origin nunca a inclui.
+    .map((s) => s.trim().replace(/\/+$/, ''))
     .filter(Boolean);
   if (listed.length === 0) return true;
   return listed.length === 1 ? listed[0] : listed;
