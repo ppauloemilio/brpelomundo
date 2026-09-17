@@ -1,13 +1,19 @@
 /**
- * Ponto de entrada serverless da Vercel. O nome `[...path]` faz a Vercel
- * encaminhar qualquer `/api/**` para cá preservando a URL original, que é o
- * que o app Express espera para casar as rotas montadas em `/api/...`.
+ * Ponto de entrada serverless da Vercel para toda a API.
+ *
+ * O rewrite `/api/(.*)` -> `/api` no vercel.json manda qualquer profundidade de
+ * caminho para cá, e a Vercel preserva a `req.url` original, que é o que o app
+ * Express espera para casar as rotas montadas em `/api/...`.
+ *
+ * Não use um catch-all `api/[...path].ts`: fora do Next.js a Vercel só casa um
+ * segmento com ele, e `/api/auth/login` morre num 404 na borda.
  *
  * Carrega o JS já compilado (`npm run build -w server`) para não depender de
- * como o bundler da Vercel resolve TypeScript fora do diretório `api/`.
- *
- * O import é dinâmico e protegido de propósito: um erro em tempo de carga
- * viraria um FUNCTION_INVOCATION_FAILED opaco, sem pista nenhuma na resposta.
+ * como o bundler da Vercel resolve TypeScript fora do diretório `api/`. O
+ * import é dinâmico e protegido porque um erro em tempo de carga viraria um
+ * FUNCTION_INVOCATION_FAILED opaco, sem pista nenhuma. Também normaliza o
+ * `default`: dependendo da interop ESM/CJS, o import estático entrega o
+ * namespace do módulo em vez do app, que então não é invocável.
  */
 import type { IncomingMessage, ServerResponse } from 'http';
 
@@ -39,8 +45,8 @@ export default async function (req: IncomingMessage, res: ServerResponse) {
   if (loadError) {
     console.error('Falha ao carregar o app Express:', loadError);
     res.statusCode = 500;
-    res.setHeader('content-type', 'text/plain; charset=utf-8');
-    res.end(`FALHA AO CARREGAR O APP\n\n${loadError.stack ?? loadError.message}`);
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'API indisponível', detail: loadError.message }));
     return;
   }
 
