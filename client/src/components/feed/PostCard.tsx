@@ -94,12 +94,12 @@ export function PostCard({ post }: { post: Post }) {
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-[15px] leading-tight">
               {post.author_snapshot.full_name}
-              {authorPremium && (
+              {!!authorPremium && (
                 <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-800">
                   {t('admin.premium')}
                 </span>
               )}
-              {post.is_promoted && (
+              {!!post.is_promoted && (
                 <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-800">
                   {t('feed.promoted')}
                 </span>

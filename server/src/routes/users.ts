@@ -154,16 +154,23 @@ router.get('/:id/posts', authMiddleware, async (req: AuthRequest, res) => {
   const authorIsPremium = isPremiumProfile(settings, authorProfile);
 
   res.json(
-    posts.map((p) => ({
-      ...p,
-      images: parseJson(p.images, []),
-      author_snapshot: {
-        ...parseJson(p.author_snapshot, {}),
-        is_premium: authorIsPremium,
-      },
-      author_is_premium: authorIsPremium,
-      liked_by_me: likedSet.has(p.id),
-    }))
+    posts.map((p) => {
+      const row = p as Record<string, unknown>;
+      const promotedInDb = !!(row.is_promoted && (
+        !row.promoted_until || new Date(row.promoted_until as string) >= new Date()
+      ));
+      return {
+        ...p,
+        images: parseJson(p.images, []),
+        is_promoted: settings.paid_posts_enabled && promotedInDb,
+        author_snapshot: {
+          ...parseJson(p.author_snapshot, {}),
+          is_premium: authorIsPremium,
+        },
+        author_is_premium: authorIsPremium,
+        liked_by_me: likedSet.has(p.id),
+      };
+    })
   );
 });
 
