@@ -351,7 +351,23 @@
     "forwardTo": "Encaminhar para",
     "noForwardTargets": "Nenhuma conversa disponível.",
     "forwardedFrom": "Encaminhada de {{name}}",
-    "edited": "editada"
+    "edited": "editada",
+    "deleted": "Esta mensagem foi apagada",
+    "deletedPreview": "Mensagem apagada",
+    "downloadOriginal": "Baixar original",
+    "emojiRecent": "Recentes",
+    "emojiRecentEmpty": "Nenhum emoji recente",
+    "emoji": {
+      "smileys": "Rostos e gestos",
+      "people": "Pessoas",
+      "animals": "Animais e natureza",
+      "food": "Comida e bebida",
+      "travel": "Viagem e lugares",
+      "activities": "Atividades",
+      "objects": "Objetos",
+      "symbols": "Símbolos",
+      "flags": "Bandeiras"
+    }
   },
   "notifications": {
     "title": "Notificações",

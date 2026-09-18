@@ -230,6 +230,7 @@ export const SCHEMA = `
     sender_id TEXT NOT NULL REFERENCES users(id),
     content TEXT NOT NULL,
     attachment_url TEXT,
+    attachment_type TEXT,
     is_read INTEGER DEFAULT 0,
     is_deleted INTEGER DEFAULT 0,
     edited_at TEXT,

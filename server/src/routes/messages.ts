@@ -28,6 +28,7 @@ type MessageRow = {
   sender_id: string;
   content: string;
   attachment_url: string | null;
+  attachment_type: string | null;
   is_read: number;
   is_deleted: number;
   edited_at: string | null;
@@ -53,16 +54,28 @@ function formatMessage(m: MessageRow) {
   };
 }
 
+function attachmentPreview(type: string | null | undefined, fallback: string) {
+  if (type === 'video') return '🎬 Vídeo';
+  if (type === 'image') return '📷 Foto';
+  return fallback;
+}
+
+function deletedPreview() {
+  return '🚫 Mensagem apagada';
+}
+
 async function refreshLastMessage(conversationId: string) {
   const last = await db.get<MessageRow>(
-    `SELECT id, content, sender_id, created_at, attachment_url FROM messages
-     WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1`,
+    `SELECT id, content, sender_id, created_at, attachment_url, attachment_type, is_deleted FROM messages
+     WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1`,
     [conversationId]
   );
   const preview = last
     ? {
         id: last.id,
-        content: last.attachment_url ? '📷 Foto' : last.content,
+        content: last.is_deleted
+          ? deletedPreview()
+          : attachmentPreview(last.attachment_type, last.content),
         sender_id: last.sender_id,
         created_at: last.created_at,
       }
@@ -182,7 +195,7 @@ router.get('/:id/messages', authMiddleware, async (req: AuthRequest, res) => {
   );
 
   const messages = await db.all<MessageRow>(
-    'SELECT * FROM messages WHERE conversation_id = ? AND is_deleted = 0 ORDER BY created_at ASC',
+    'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC',
     [id]
   );
 
@@ -203,7 +216,7 @@ router.get('/:id/messages', authMiddleware, async (req: AuthRequest, res) => {
 
 router.post('/:id/messages', authMiddleware, async (req: AuthRequest, res) => {
   const conversationId = paramId(req.params.id);
-  const { content, attachment_url } = req.body;
+  const { content, attachment_url, attachment_type } = req.body;
   if (!content?.trim() && !attachment_url) {
     return res.status(400).json({ error: 'Mensagem vazia' });
   }
@@ -220,13 +233,14 @@ router.post('/:id/messages', authMiddleware, async (req: AuthRequest, res) => {
   const now = new Date().toISOString();
   const text = content?.trim() || '';
   await db.run(
-    'INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url) VALUES (?, ?, ?, ?, ?)',
-    [id, conversationId, req.user!.id, text, attachment_url || null]
+    `INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url, attachment_type)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, conversationId, req.user!.id, text, attachment_url || null, attachment_type || null]
   );
 
   const lastMessage = {
     id,
-    content: attachment_url ? '📷 Foto' : text,
+    content: attachment_url ? attachmentPreview(attachment_type, text) : text,
     sender_id: req.user!.id,
     created_at: now,
   };
@@ -299,9 +313,14 @@ router.delete('/:id/messages/:messageId', authMiddleware, async (req: AuthReques
   if (!message) return res.status(404).json({ error: 'Mensagem não encontrada' });
   if (message.sender_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
 
-  await db.run('UPDATE messages SET is_deleted = 1 WHERE id = ?', [messageId]);
+  await db.run(
+    `UPDATE messages SET is_deleted = 1, content = '', attachment_url = NULL, attachment_type = NULL
+     WHERE id = ?`,
+    [messageId]
+  );
   await refreshLastMessage(conversationId);
-  res.json({ ok: true });
+  const tombstone = await db.get<MessageRow>('SELECT * FROM messages WHERE id = ?', [messageId]);
+  res.json(formatMessage(tombstone!));
 });
 
 router.post('/:id/messages/:messageId/forward', authMiddleware, async (req: AuthRequest, res) => {
@@ -360,12 +379,22 @@ router.post('/:id/messages/:messageId/forward', authMiddleware, async (req: Auth
   });
 
   await db.run(
-    `INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url, forwarded_from)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, targetId, req.user!.id, message.content, message.attachment_url, forwardedFrom]
+    `INSERT INTO messages (id, conversation_id, sender_id, content, attachment_url, attachment_type, forwarded_from)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      targetId,
+      req.user!.id,
+      message.content,
+      message.attachment_url,
+      message.attachment_type,
+      forwardedFrom,
+    ]
   );
 
-  const preview = message.attachment_url ? '📷 Foto' : message.content;
+  const preview = message.attachment_url
+    ? attachmentPreview(message.attachment_type, message.content)
+    : message.content;
   const targetConv = await db.get<{ unread_count: string }>(
     'SELECT unread_count FROM conversations WHERE id = ?',
     [targetId]

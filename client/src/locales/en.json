@@ -351,7 +351,23 @@
     "forwardTo": "Forward to",
     "noForwardTargets": "No conversations available.",
     "forwardedFrom": "Forwarded from {{name}}",
-    "edited": "edited"
+    "edited": "edited",
+    "deleted": "This message was deleted",
+    "deletedPreview": "Message deleted",
+    "downloadOriginal": "Download original",
+    "emojiRecent": "Recent",
+    "emojiRecentEmpty": "No recent emojis",
+    "emoji": {
+      "smileys": "Smileys & people",
+      "people": "People",
+      "animals": "Animals & nature",
+      "food": "Food & drink",
+      "travel": "Travel & places",
+      "activities": "Activities",
+      "objects": "Objects",
+      "symbols": "Symbols",
+      "flags": "Flags"
+    }
   },
   "notifications": {
     "title": "Notifications",

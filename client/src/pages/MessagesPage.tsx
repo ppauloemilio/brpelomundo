@@ -5,10 +5,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search, Plus, MoreVertical, Smile, Send, Pencil, Forward, Trash2, Check, ImagePlus,
 } from 'lucide-react';
-import { api, assetUrl, uploadFile } from '@/lib/api';
+import { api, uploadFile } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { ForwardDialog } from '@/components/messages/ForwardDialog';
+import { EmojiPicker } from '@/components/messages/EmojiPicker';
+import { MessageAttachment } from '@/components/messages/MessageAttachment';
 import { cn } from '@/lib/utils';
 
 type OtherUser = { id: string; full_name: string; username: string; avatar_url: string | null };
@@ -27,9 +29,11 @@ type Message = {
   sender_id: string;
   content: string;
   attachment_url?: string | null;
+  attachment_type?: 'image' | 'video' | string | null;
   created_at: string;
   edited_at?: string | null;
   is_read: boolean;
+  is_deleted?: boolean;
   forwarded_from?: { sender_name: string } | null;
 };
 
@@ -56,7 +60,9 @@ export function MessagesPage() {
   const [showNewChat, setShowNewChat] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations'],
@@ -80,7 +86,7 @@ export function MessagesPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: (body: { content?: string; attachment_url?: string }) =>
+    mutationFn: (body: { content?: string; attachment_url?: string; attachment_type?: string }) =>
       api(`/conversations/${activeId}/messages`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       setText('');
@@ -160,17 +166,23 @@ export function MessagesPage() {
     return name.includes(q) || preview.includes(q);
   });
 
-  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeId) return;
     setUploading(true);
     try {
       const { url } = await uploadFile(file);
-      sendMutation.mutate({ content: '', attachment_url: url });
+      const attachment_type = file.type.startsWith('video/') ? 'video' : 'image';
+      sendMutation.mutate({ content: '', attachment_url: url, attachment_type });
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setText((prev) => prev + emoji);
+    setEmojiOpen(false);
   };
 
   return (
@@ -248,8 +260,15 @@ export function MessagesPage() {
                         </span>
                       )}
                     </div>
-                    <p className="truncate text-sm text-slate-500">
-                      {c.last_message?.content || '...'}
+                    <p
+                      className={cn(
+                        'truncate text-sm text-slate-500',
+                        c.last_message?.content?.includes('🚫') && 'italic'
+                      )}
+                    >
+                      {c.last_message?.content?.includes('🚫')
+                        ? t('messages.deletedPreview')
+                        : c.last_message?.content || '...'}
                     </p>
                   </div>
                   {unread > 0 && (
@@ -292,22 +311,24 @@ export function MessagesPage() {
               {messages.map((m) => {
                 const mine = m.sender_id === user?.id;
                 const isEditing = editingId === m.id;
+                const deleted = !!m.is_deleted;
 
                 return (
                   <div key={m.id} className={cn('mb-2 flex', mine ? 'justify-end' : 'justify-start')}>
                     <div
                       className={cn(
                         'group relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
-                        mine ? 'bg-[#d9fdd3]' : 'bg-white'
+                        mine ? 'bg-[#d9fdd3]' : 'bg-white',
+                        deleted && 'bg-slate-100/90'
                       )}
                     >
-                      {m.forwarded_from && (
+                      {m.forwarded_from && !deleted && (
                         <p className="mb-1 text-[10px] italic text-slate-500">
                           {t('messages.forwardedFrom', { name: m.forwarded_from.sender_name })}
                         </p>
                       )}
 
-                      {mine && !isEditing && (
+                      {mine && !isEditing && !deleted && (
                         <div className="absolute -top-3 right-0 flex gap-0.5 rounded-md bg-white/90 px-1 py-0.5 opacity-0 shadow group-hover:opacity-100">
                           {!m.attachment_url && (
                             <button
@@ -363,14 +384,15 @@ export function MessagesPage() {
                             </button>
                           </div>
                         </div>
+                      ) : deleted ? (
+                        <p className="flex items-center gap-1.5 text-sm italic text-slate-500">
+                          <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                          {t('messages.deleted')}
+                        </p>
                       ) : (
                         <>
                           {m.attachment_url && (
-                            <img
-                              src={assetUrl(m.attachment_url) ?? m.attachment_url}
-                              alt=""
-                              className="mb-1 max-h-64 w-full rounded-lg object-cover"
-                            />
+                            <MessageAttachment url={m.attachment_url} type={m.attachment_type} />
                           )}
                           {m.content && <p className="whitespace-pre-wrap text-sm text-slate-900">{m.content}</p>}
                         </>
@@ -401,10 +423,30 @@ export function MessagesPage() {
               >
                 <ImagePlus className="h-5 w-5" />
               </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
-              <button type="button" className="rounded-full p-2 text-slate-500 hover:bg-slate-200/60">
-                <Smile className="h-5 w-5" />
-              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={handleMediaPick}
+              />
+              <div className="relative">
+                <button
+                  ref={emojiBtnRef}
+                  type="button"
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-200/60"
+                  onClick={() => setEmojiOpen((o) => !o)}
+                  aria-label={t('messages.emoji.smileys')}
+                >
+                  <Smile className="h-5 w-5" />
+                </button>
+                <EmojiPicker
+                  open={emojiOpen}
+                  onClose={() => setEmojiOpen(false)}
+                  onPick={insertEmoji}
+                  anchorRef={emojiBtnRef}
+                />
+              </div>
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
