@@ -122,7 +122,7 @@ export function MessagesPage() {
       target_conversation_id?: string;
       recipient_id?: string;
     }) =>
-      api(`/conversations/${activeId}/messages/${messageId}/forward`, {
+      api<{ conversation_id: string }>(`/conversations/${activeId}/messages/${messageId}/forward`, {
         method: 'POST',
         body: JSON.stringify({ target_conversation_id, recipient_id }),
       }),
