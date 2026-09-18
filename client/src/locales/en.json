@@ -276,10 +276,11 @@
     "imageSettings": "Images in the text",
     "imageNumber": "Image {{number}}",
     "imageWidth": "Width",
-    "imageAlignLeft": "Left, text alongside",
+    "imageAlignLeft": "Align left",
     "imageAlignCenter": "Centered",
-    "imageAlignRight": "Right, text alongside",
+    "imageAlignRight": "Align right",
     "imageAlignFull": "Full width",
+    "imageOrderHint": "Order in the text sets placement: text above or below each image. Use blank lines to separate blocks.",
     "imageRemove": "Remove image",
     "imageUploadFailed": "Could not upload the image.",
     "publish": "Publish"

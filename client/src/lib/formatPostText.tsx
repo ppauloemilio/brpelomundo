@@ -236,23 +236,22 @@ function parseBlocks(text: string): Block[] {
   return blocks;
 }
 
-/** `left`/`right` flutuam para o texto correr ao lado; `center`/`full` ocupam a linha. */
+/** Cada imagem ocupa sua linha; left/right alinham na horizontal, sem float. */
 function imageBlockClass(align: ImageAlign) {
   switch (align) {
     case 'left':
-      return 'float-left mr-3 mb-2 max-w-[70%]';
+      return 'mr-auto';
     case 'right':
-      return 'float-right ml-3 mb-2 max-w-[70%]';
+      return 'ml-auto';
     case 'center':
-      return 'mx-auto my-2';
+      return 'mx-auto';
     default:
-      return 'my-2';
+      return '';
   }
 }
 
 export function FormattedText({ text, className }: { text: string; className?: string }) {
   const blocks = parseBlocks(text);
-  const hasFloat = blocks.some((b) => b.type === 'image' && (b.align === 'left' || b.align === 'right'));
 
   return (
     <div className={className}>
@@ -260,7 +259,11 @@ export function FormattedText({ text, className }: { text: string; className?: s
         switch (block.type) {
           case 'image':
             return (
-              <span key={i} className={`block ${imageBlockClass(block.align)}`} style={{ width: `${block.width}%` }}>
+              <span
+                key={i}
+                className={`my-2 block ${imageBlockClass(block.align)}`}
+                style={{ width: block.align === 'full' ? '100%' : `${block.width}%` }}
+              >
                 <img
                   src={assetUrl(block.url) ?? block.url}
                   alt=""
@@ -308,8 +311,6 @@ export function FormattedText({ text, className }: { text: string; className?: s
             );
         }
       })}
-      {/* Encerra os floats para a imagem não vazar do card. */}
-      {hasFloat && <span className="block clear-both" />}
     </div>
   );
 }

@@ -36,6 +36,7 @@ export function PostImageControls({ content, onChange }: Props) {
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-slate-500">{t('post.imageSettings')}</p>
+      <p className="text-xs text-slate-400">{t('post.imageOrderHint')}</p>
 
       {images.map((image, index) => (
         <div

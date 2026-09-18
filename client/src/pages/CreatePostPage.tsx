@@ -96,7 +96,7 @@ export function CreatePostPage() {
     try {
       const { url } = await uploadFile(file);
       const at = Math.min(cursorRef.current, content.length);
-      const { value, cursor } = insertImageToken(content, at, buildImageToken(url));
+      const { value, cursor } = insertImageToken(content, at, buildImageToken(url, 'center', 80));
       setContent(value);
       requestAnimationFrame(() => {
         const el = textareaRef.current;

@@ -276,10 +276,11 @@
     "imageSettings": "Imagens no texto",
     "imageNumber": "Imagem {{number}}",
     "imageWidth": "Largura",
-    "imageAlignLeft": "À esquerda, texto ao lado",
+    "imageAlignLeft": "Alinhada à esquerda",
     "imageAlignCenter": "Centralizada",
-    "imageAlignRight": "À direita, texto ao lado",
+    "imageAlignRight": "Alinhada à direita",
     "imageAlignFull": "Largura total",
+    "imageOrderHint": "A ordem no texto define a posição: texto acima ou abaixo de cada imagem. Use linhas vazias para separar blocos.",
     "imageRemove": "Remover imagem",
     "imageUploadFailed": "Não foi possível enviar a imagem.",
     "publish": "Publicar"
