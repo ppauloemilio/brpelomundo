@@ -232,6 +232,8 @@ export const SCHEMA = `
     attachment_url TEXT,
     is_read INTEGER DEFAULT 0,
     is_deleted INTEGER DEFAULT 0,
+    edited_at TEXT,
+    forwarded_from TEXT,
     created_at TEXT NOT NULL DEFAULT utc_now()
   );
 

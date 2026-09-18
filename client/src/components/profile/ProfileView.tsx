@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin, Briefcase, Calendar, LayoutGrid, Building2, Pencil, Settings, UserPlus, MessageCircle, Ban,
+  MapPin, Briefcase, Calendar, LayoutGrid, Building2, Pencil, Settings, UserPlus, MessageCircle, Ban, Users, UserCheck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PostCard, Post } from '@/components/feed/PostCard';
@@ -30,9 +31,12 @@ export type ProfileData = {
   created_at?: string;
   followers_count: number;
   following_count: number;
+  friends_count?: number;
   posts_count?: number;
   skills?: Array<{ id: string; skill_name: string; proficiency_level: string; years_experience: number }>;
   is_following?: boolean;
+  friendship_status?: 'none' | 'pending_sent' | 'pending_received' | 'friends' | 'self';
+  friendship_id?: string;
   is_premium?: boolean;
   is_verified?: boolean;
   email_verified?: boolean;
@@ -40,7 +44,7 @@ export type ProfileData = {
   rating_count?: number;
 };
 
-type Tab = 'posts' | 'skills' | 'businesses';
+type Tab = 'posts' | 'skills' | 'businesses' | 'friends';
 
 function formatJoinDate(date: string, locale: string) {
   return new Date(date).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
@@ -81,6 +85,29 @@ export function ProfileView({
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', userId] }),
   });
 
+  const friendMutation = useMutation({
+    mutationFn: () => {
+      const status = user?.friendship_status;
+      if (status === 'friends' || status === 'pending_sent') {
+        return api(`/social/friendships/user/${userId}`, { method: 'DELETE' });
+      }
+      if (status === 'pending_received') {
+        return api(`/social/friendships/accept/${userId}`, { method: 'POST' });
+      }
+      return api('/social/friendships', { method: 'POST', body: JSON.stringify({ receiver_id: userId }) });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['profile', userId] });
+      qc.invalidateQueries({ queryKey: ['friends'] });
+      qc.invalidateQueries({ queryKey: ['user-friends', userId] });
+    },
+  });
+
+  const rejectFriendMutation = useMutation({
+    mutationFn: () => api(`/social/friendships/reject/${userId}`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', userId] }),
+  });
+
   const messageMutation = useMutation({
     mutationFn: () => api<{ id: string }>('/conversations', { method: 'POST', body: JSON.stringify({ participant_ids: [userId], type: 'user_user' }) }),
     onSuccess: (conv: { id: string }) => navigate(`/messages?conversation=${conv.id}`),
@@ -115,6 +142,15 @@ export function ProfileView({
     enabled: tab === 'businesses',
   });
 
+  const { data: userFriends = [] } = useQuery({
+    queryKey: ['user-friends', userId],
+    queryFn: () =>
+      api<Array<{ friend_id: string; full_name: string; username: string; avatar_url: string | null }>>(
+        `/social/friendships/user/${userId}`
+      ),
+    enabled: tab === 'friends',
+  });
+
   if (isLoading || !user) return <p className="py-12 text-center text-slate-500">{t('common.loading')}</p>;
 
   const locationLabel = user.current_city
@@ -128,9 +164,19 @@ export function ProfileView({
 
   const tabs: { key: Tab; label: string; icon: typeof LayoutGrid }[] = [
     { key: 'posts', label: t('profile.tabPosts'), icon: LayoutGrid },
+    { key: 'friends', label: t('community.friends'), icon: Users },
     { key: 'skills', label: t('profile.tabSkills'), icon: Briefcase },
     { key: 'businesses', label: t('profile.tabBusinesses'), icon: Building2 },
   ];
+
+  const friendButtonLabel = () => {
+    switch (user?.friendship_status) {
+      case 'friends': return t('community.friends');
+      case 'pending_sent': return t('community.friendPending');
+      case 'pending_received': return t('community.acceptFriend');
+      default: return t('community.friendRequest');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -147,6 +193,10 @@ export function ProfileView({
             <div>
               <p className="text-lg font-bold">{postsCount}</p>
               <p className="text-xs text-slate-500">{t('profile.posts')}</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold">{user.friends_count ?? 0}</p>
+              <p className="text-xs text-slate-500">{t('community.friends')}</p>
             </div>
             <div>
               <p className="text-lg font-bold">{user.followers_count}</p>
@@ -228,9 +278,38 @@ export function ProfileView({
             )}
             {showFollow && (
               <>
-                <Button size="sm" className="rounded-full" onClick={() => followMutation.mutate()}>
+                <Button
+                  size="sm"
+                  className="rounded-full"
+                  variant={user.friendship_status === 'friends' ? 'outline' : 'default'}
+                  onClick={() => friendMutation.mutate()}
+                  disabled={friendMutation.isPending}
+                >
+                  {user.friendship_status === 'friends' ? (
+                    <UserCheck className="h-4 w-4" />
+                  ) : (
+                    <UserPlus className="h-4 w-4" />
+                  )}
+                  {friendButtonLabel()}
+                </Button>
+                {user.friendship_status === 'pending_received' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full text-slate-600"
+                    onClick={() => rejectFriendMutation.mutate()}
+                  >
+                    {t('community.rejectFriend')}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => followMutation.mutate()}
+                >
                   <UserPlus className="h-4 w-4" />
-                  {user.is_following ? t('community.unfollow') : t('community.follow')}
+                  {user.is_following ? t('community.following') : t('community.follow')}
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-full" onClick={() => messageMutation.mutate()}>
                   <MessageCircle className="h-4 w-4" />
@@ -268,6 +347,30 @@ export function ProfileView({
           ) : (
             posts.map((post) => <PostCard key={post.id} post={post} />)
           )
+        )}
+        {tab === 'friends' && (
+          <Card>
+            <CardContent className="divide-y pt-2">
+              {userFriends.length === 0 ? (
+                <p className="py-8 text-center text-slate-500">{t('community.noFriends')}</p>
+              ) : (
+                userFriends.map((f) => (
+                  <button
+                    key={f.friend_id}
+                    type="button"
+                    className="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"
+                    onClick={() => navigate(`/user/${f.friend_id}`)}
+                  >
+                    <Avatar name={f.full_name} src={f.avatar_url} className="h-10 w-10" />
+                    <div>
+                      <p className="font-medium text-slate-900">{f.full_name}</p>
+                      <p className="text-sm text-slate-500">@{f.username}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
         )}
         {tab === 'skills' && (
           <Card>

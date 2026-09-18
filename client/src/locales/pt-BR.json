@@ -327,13 +327,31 @@
     "following": "Seguindo",
     "unfollow": "Deixar de seguir",
     "friendRequest": "Adicionar amigo",
-    "friends": "Amigos"
+    "friends": "Amigos",
+    "friendPending": "Solicitação enviada",
+    "acceptFriend": "Aceitar amizade",
+    "rejectFriend": "Recusar",
+    "noFriends": "Nenhum amigo ainda."
   },
   "messages": {
     "title": "Mensagens",
-    "placeholder": "Digite sua mensagem...",
+    "placeholder": "Digite uma mensagem",
     "empty": "Nenhuma conversa ainda.",
-    "start": "Iniciar conversa"
+    "start": "Iniciar conversa",
+    "search": "Pesquisar ou começar uma nova conversa",
+    "filterAll": "Tudo",
+    "filterUnread": "Não lidas",
+    "unknownUser": "Usuário",
+    "selectConversation": "Selecione uma conversa",
+    "selectConversationHint": "Escolha alguém na lista ou inicie um novo chat.",
+    "newChat": "Nova conversa",
+    "noFriendsToChat": "Adicione amigos para iniciar conversas.",
+    "edit": "Editar",
+    "forward": "Encaminhar",
+    "forwardTo": "Encaminhar para",
+    "noForwardTargets": "Nenhuma conversa disponível.",
+    "forwardedFrom": "Encaminhada de {{name}}",
+    "edited": "editada"
   },
   "notifications": {
     "title": "Notificações",

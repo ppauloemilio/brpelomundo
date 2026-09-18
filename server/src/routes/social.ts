@@ -51,6 +51,83 @@ router.post('/friendships', authMiddleware, async (req: AuthRequest, res) => {
   res.status(201).json({ id, status: 'pending' });
 });
 
+router.get('/friendships/pending', authMiddleware, async (req: AuthRequest, res) => {
+  const pending = await db.all(
+    `SELECT f.*, u.id AS user_id, u.username, u.full_name, u.avatar_url
+     FROM friendships f
+     JOIN users u ON u.id = f.requester_id
+     WHERE f.receiver_id = ? AND f.status = 'pending'
+     ORDER BY f.created_at DESC`,
+    [req.user!.id]
+  );
+  res.json(pending);
+});
+
+router.get('/friendships/status/:userId', authMiddleware, async (req: AuthRequest, res) => {
+  const userId = paramId(req.params.userId);
+  if (userId === req.user!.id) return res.json({ status: 'self' });
+
+  const row = await db.get<{ id: string; requester_id: string; receiver_id: string; status: string }>(
+    `SELECT * FROM friendships WHERE
+     (requester_id = ? AND receiver_id = ?) OR (requester_id = ? AND receiver_id = ?)`,
+    [req.user!.id, userId, userId, req.user!.id]
+  );
+
+  if (!row) return res.json({ status: 'none' });
+  if (row.status === 'accepted') return res.json({ status: 'friends', friendship_id: row.id });
+  if (row.status === 'pending' && row.requester_id === req.user!.id) {
+    return res.json({ status: 'pending_sent', friendship_id: row.id });
+  }
+  if (row.status === 'pending' && row.receiver_id === req.user!.id) {
+    return res.json({ status: 'pending_received', friendship_id: row.id });
+  }
+  return res.json({ status: 'none' });
+});
+
+router.post('/friendships/accept/:userId', authMiddleware, async (req: AuthRequest, res) => {
+  const userId = paramId(req.params.userId);
+  const friendship = await db.get<{ id: string; requester_id: string }>(
+    `SELECT * FROM friendships WHERE requester_id = ? AND receiver_id = ? AND status = 'pending'`,
+    [userId, req.user!.id]
+  );
+  if (!friendship) return res.status(404).json({ error: 'Solicitação não encontrada' });
+
+  await db.run('UPDATE friendships SET status = ? WHERE id = ?', ['accepted', friendship.id]);
+  await createNotification(friendship.requester_id, req.user!.id, 'friendship_accepted', 'user', req.user!.id);
+  res.json({ ok: true, status: 'accepted' });
+});
+
+router.post('/friendships/reject/:userId', authMiddleware, async (req: AuthRequest, res) => {
+  const userId = paramId(req.params.userId);
+  await db.run(
+    `DELETE FROM friendships WHERE requester_id = ? AND receiver_id = ? AND status = 'pending'`,
+    [userId, req.user!.id]
+  );
+  res.json({ ok: true });
+});
+
+router.delete('/friendships/user/:userId', authMiddleware, async (req: AuthRequest, res) => {
+  const userId = paramId(req.params.userId);
+  await db.run(
+    `DELETE FROM friendships WHERE
+     (requester_id = ? AND receiver_id = ?) OR (requester_id = ? AND receiver_id = ?)`,
+    [req.user!.id, userId, userId, req.user!.id]
+  );
+  res.json({ ok: true });
+});
+
+router.get('/friendships/user/:userId', authMiddleware, async (req: AuthRequest, res) => {
+  const userId = paramId(req.params.userId);
+  const friendships = await db.all(
+    `SELECT f.*, u.id AS friend_id, u.username, u.full_name, u.avatar_url FROM friendships f
+     JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.receiver_id ELSE f.requester_id END
+     WHERE (f.requester_id = ? OR f.receiver_id = ?) AND f.status = 'accepted'
+     ORDER BY u.full_name`,
+    [userId, userId, userId]
+  );
+  res.json(friendships);
+});
+
 router.patch('/friendships/:id', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
   const { status } = req.body;
@@ -72,9 +149,10 @@ router.patch('/friendships/:id', authMiddleware, async (req: AuthRequest, res) =
 
 router.get('/friendships', authMiddleware, async (req: AuthRequest, res) => {
   const friendships = await db.all(
-    `SELECT f.*, u.username, u.full_name, u.avatar_url FROM friendships f
+    `SELECT f.*, u.id AS friend_id, u.username, u.full_name, u.avatar_url FROM friendships f
      JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.receiver_id ELSE f.requester_id END
-     WHERE (f.requester_id = ? OR f.receiver_id = ?) AND f.status = 'accepted'`,
+     WHERE (f.requester_id = ? OR f.receiver_id = ?) AND f.status = 'accepted'
+     ORDER BY u.full_name`,
     [req.user!.id, req.user!.id, req.user!.id]
   );
   res.json(friendships);

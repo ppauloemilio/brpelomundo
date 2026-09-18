@@ -50,9 +50,14 @@ function formatUser(
 }
 
 async function profileStats(userId: string) {
-  const [followers, following, posts, rating] = await Promise.all([
+  const [followers, following, friends, posts, rating] = await Promise.all([
     db.get<{ c: number }>('SELECT COUNT(*) as c FROM follows WHERE following_id = ?', [userId]),
     db.get<{ c: number }>('SELECT COUNT(*) as c FROM follows WHERE follower_id = ?', [userId]),
+    db.get<{ c: number }>(
+      `SELECT COUNT(*) as c FROM friendships
+       WHERE status = 'accepted' AND (requester_id = ? OR receiver_id = ?)`,
+      [userId, userId]
+    ),
     db.get<{ c: number }>(
       'SELECT COUNT(*) as c FROM posts WHERE author_id = ? AND is_active = 1',
       [userId]
@@ -66,10 +71,29 @@ async function profileStats(userId: string) {
   return {
     followers_count: followers?.c ?? 0,
     following_count: following?.c ?? 0,
+    friends_count: friends?.c ?? 0,
     posts_count: posts?.c ?? 0,
     rating_avg: Number(rating?.avg_rating || 0),
     rating_count: rating?.rating_count || 0,
   };
+}
+
+async function friendshipStatus(viewerId: string, profileId: string) {
+  if (viewerId === profileId) return { status: 'self' as const };
+  const row = await db.get<{ id: string; requester_id: string; receiver_id: string; status: string }>(
+    `SELECT * FROM friendships WHERE
+     (requester_id = ? AND receiver_id = ?) OR (requester_id = ? AND receiver_id = ?)`,
+    [viewerId, profileId, profileId, viewerId]
+  );
+  if (!row) return { status: 'none' as const };
+  if (row.status === 'accepted') return { status: 'friends' as const, friendship_id: row.id };
+  if (row.status === 'pending' && row.requester_id === viewerId) {
+    return { status: 'pending_sent' as const, friendship_id: row.id };
+  }
+  if (row.status === 'pending' && row.receiver_id === viewerId) {
+    return { status: 'pending_received' as const, friendship_id: row.id };
+  }
+  return { status: 'none' as const };
 }
 
 router.get('/', authMiddleware, async (req, res) => {
@@ -163,14 +187,19 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
   ]);
 
   if (req.user!.id !== user.id) {
-    const isFollowing = await db.get(
-      'SELECT id FROM follows WHERE follower_id = ? AND following_id = ?',
-      [req.user!.id, user.id]
-    );
+    const [isFollowing, friendship] = await Promise.all([
+      db.get('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?', [
+        req.user!.id,
+        user.id,
+      ]),
+      friendshipStatus(req.user!.id, user.id),
+    ]);
     const publicProfile = {
       ...formatUser(settings, user, profile, stats),
       skills,
       is_following: !!isFollowing,
+      friendship_status: friendship.status,
+      friendship_id: 'friendship_id' in friendship ? friendship.friendship_id : undefined,
     };
     if (!publicProfile.show_city_on_profile) {
       publicProfile.current_city = '';

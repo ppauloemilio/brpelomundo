@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { v4 as uuid } from 'uuid';
 import { db } from './sql.js';
 import { SCHEMA, UTC_NOW_FUNCTION } from './schema.js';
+import { migrateSchema } from './migrate.js';
 import { seedDatabase } from './seed.js';
 import { seedAppSettings } from '../lib/settings.js';
 import { seedMonetizationExamples } from '../lib/seedMonetizationExamples.js';
@@ -12,6 +13,7 @@ import { ensureAdminUser } from '../lib/adminUser.js';
 export async function createSchema() {
   await db.exec(UTC_NOW_FUNCTION);
   await db.exec(SCHEMA);
+  await migrateSchema();
 }
 
 /** Ajustes nos dados demo — depende do seed principal ter rodado. */

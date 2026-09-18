@@ -327,13 +327,31 @@
     "following": "Following",
     "unfollow": "Unfollow",
     "friendRequest": "Add friend",
-    "friends": "Friends"
+    "friends": "Friends",
+    "friendPending": "Request sent",
+    "acceptFriend": "Accept friend",
+    "rejectFriend": "Decline",
+    "noFriends": "No friends yet."
   },
   "messages": {
     "title": "Messages",
-    "placeholder": "Type your message...",
+    "placeholder": "Type a message",
     "empty": "No conversations yet.",
-    "start": "Start conversation"
+    "start": "Start conversation",
+    "search": "Search or start a new conversation",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "unknownUser": "User",
+    "selectConversation": "Select a conversation",
+    "selectConversationHint": "Pick someone from the list or start a new chat.",
+    "newChat": "New chat",
+    "noFriendsToChat": "Add friends to start conversations.",
+    "edit": "Edit",
+    "forward": "Forward",
+    "forwardTo": "Forward to",
+    "noForwardTargets": "No conversations available.",
+    "forwardedFrom": "Forwarded from {{name}}",
+    "edited": "edited"
   },
   "notifications": {
     "title": "Notifications",

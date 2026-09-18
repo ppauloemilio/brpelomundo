@@ -17,6 +17,11 @@ import classifiedsRoutes from './routes/classifieds.js';
 import reviewsRoutes from './routes/reviews.js';
 import moderationRoutes from './routes/moderation.js';
 import billingRoutes from './routes/billing.js';
+import { migrateSchema } from './db/migrate.js';
+
+const schemaReady = migrateSchema().catch((err) => {
+  console.error('Falha na migração do schema:', err);
+});
 
 /** Origens permitidas (APP_URL e/ou CORS_ORIGIN separados por vírgula). Sem isso, libera tudo. */
 function resolveCorsOrigin(): boolean | string | string[] {
@@ -33,6 +38,11 @@ function resolveCorsOrigin(): boolean | string | string[] {
 
 export function createApp() {
   const app = express();
+
+  app.use(async (_req, _res, next) => {
+    await schemaReady;
+    next();
+  });
 
   app.use(cors({ origin: resolveCorsOrigin(), credentials: true }));
   app.use(express.json());
