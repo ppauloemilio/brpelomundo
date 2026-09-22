@@ -5,7 +5,16 @@ import { setMonetizationSettings } from './settings.js';
 export type BillingPlan = {
   id: string;
   code: string;
-  product_type: 'premium' | 'featured_business' | 'promoted_post' | 'ad_campaign';
+  product_type:
+    | 'premium'
+    | 'featured_business'
+    | 'promoted_post'
+    | 'ad_campaign'
+    | 'classified_extra'
+    | 'classified_featured'
+    | 'promoted_job'
+    | 'sponsored_event'
+    | 'local_business';
   name: string;
   description: string;
   price_cents: number;
@@ -144,9 +153,17 @@ function isoDay(date: Date) {
 async function ensureToggleForProduct(productType: string) {
   const patch: Record<string, boolean> = {};
   if (productType === 'premium') patch.premium_profile_enabled = true;
-  if (productType === 'featured_business') patch.featured_business_enabled = true;
-  if (productType === 'promoted_post') patch.paid_posts_enabled = true;
+  if (productType === 'featured_business' || productType === 'local_business') {
+    patch.featured_business_enabled = true;
+  }
+  if (productType === 'promoted_post' || productType === 'promoted_job') {
+    patch.paid_posts_enabled = true;
+  }
   if (productType === 'ad_campaign') patch.ads_enabled = true;
+  if (productType === 'classified_extra' || productType === 'classified_featured') {
+    patch.classifieds_paid_enabled = true;
+  }
+  if (productType === 'sponsored_event') patch.sponsored_events_enabled = true;
   if (Object.keys(patch).length) await setMonetizationSettings(patch);
 }
 
@@ -179,32 +196,74 @@ async function activateEntitlement(
     return { target_type: 'user', target_id: userId, ends_at: extended };
   }
 
-  if (plan.product_type === 'featured_business') {
+  if (plan.product_type === 'featured_business' || plan.product_type === 'local_business') {
     if (!targetId) throw new Error('Selecione um negócio para destacar');
-    const biz = await db.get<{ id: string; owner_id: string }>(
-      'SELECT id, owner_id FROM businesses WHERE id = ? AND is_active = 1',
+    const biz = await db.get<{ id: string; owner_id: string; city: string }>(
+      'SELECT id, owner_id, city FROM businesses WHERE id = ? AND is_active = 1',
       [targetId]
     );
     if (!biz || biz.owner_id !== userId) throw new Error('Negócio inválido');
+    const featuredCity = plan.product_type === 'local_business' ? (biz.city || '').trim() : null;
     await db.run(
-      `UPDATE businesses SET is_featured = 1, featured_until = ?, featured_order = 0 WHERE id = ?`,
-      [endsAt, targetId]
+      `UPDATE businesses SET is_featured = 1, featured_until = ?, featured_order = 0, featured_city = ? WHERE id = ?`,
+      [endsAt, featuredCity, targetId]
     );
     return { target_type: 'business', target_id: targetId, ends_at: endsAt };
   }
 
-  if (plan.product_type === 'promoted_post') {
+  if (plan.product_type === 'promoted_post' || plan.product_type === 'promoted_job') {
     if (!targetId) throw new Error('Selecione uma publicação para promover');
-    const post = await db.get<{ id: string; author_id: string }>(
-      'SELECT id, author_id FROM posts WHERE id = ? AND is_active = 1',
+    const post = await db.get<{ id: string; author_id: string; type: string }>(
+      'SELECT id, author_id, type FROM posts WHERE id = ? AND is_active = 1',
       [targetId]
     );
     if (!post || post.author_id !== userId) throw new Error('Publicação inválida');
+    if (plan.product_type === 'promoted_job' && post.type !== 'job') {
+      throw new Error('Selecione uma publicação do tipo vaga');
+    }
     await db.run('UPDATE posts SET is_promoted = 1, promoted_until = ? WHERE id = ?', [
       endsAt,
       targetId,
     ]);
     return { target_type: 'post', target_id: targetId, ends_at: endsAt };
+  }
+
+  if (plan.product_type === 'classified_extra') {
+    await db.run(
+      `INSERT INTO public_profiles (user_id, current_country, extra_classified_slots)
+       VALUES (?, 'BR', 1)
+       ON CONFLICT (user_id) DO UPDATE SET extra_classified_slots = public_profiles.extra_classified_slots + 1`,
+      [userId]
+    );
+    return { target_type: 'user', target_id: userId, ends_at: endsAt };
+  }
+
+  if (plan.product_type === 'classified_featured') {
+    if (!targetId) throw new Error('Selecione um classificado para destacar');
+    const listing = await db.get<{ id: string; seller_id: string }>(
+      'SELECT id, seller_id FROM classifieds WHERE id = ? AND is_active = 1',
+      [targetId]
+    );
+    if (!listing || listing.seller_id !== userId) throw new Error('Classificado inválido');
+    await db.run(
+      'UPDATE classifieds SET is_featured = 1, featured_until = ? WHERE id = ?',
+      [endsAt, targetId]
+    );
+    return { target_type: 'classified', target_id: targetId, ends_at: endsAt };
+  }
+
+  if (plan.product_type === 'sponsored_event') {
+    if (!targetId) throw new Error('Selecione um evento para patrocinar');
+    const event = await db.get<{ id: string; organizer_id: string }>(
+      'SELECT id, organizer_id FROM community_events WHERE id = ? AND is_active = 1',
+      [targetId]
+    );
+    if (!event || event.organizer_id !== userId) throw new Error('Evento inválido');
+    await db.run(
+      'UPDATE community_events SET is_sponsored = 1, sponsored_until = ? WHERE id = ?',
+      [endsAt, targetId]
+    );
+    return { target_type: 'event', target_id: targetId, ends_at: endsAt };
   }
 
   if (plan.product_type === 'ad_campaign') {

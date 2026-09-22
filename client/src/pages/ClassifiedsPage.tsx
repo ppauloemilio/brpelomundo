@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, Star, Tag } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -30,7 +31,10 @@ type Listing = {
   status: string;
   rating_avg: number;
   rating_count: number;
+  is_featured?: boolean;
 };
+
+type ClassifiedQuota = { used: number; max: number; can_create: boolean; premium: boolean };
 
 const CATEGORIES = [
   'furniture', 'electronics', 'cars', 'clothes', 'real_estate',
@@ -39,8 +43,10 @@ const CATEGORIES = [
 
 export function ClassifiedsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const qc = useQueryClient();
+  const [createError, setCreateError] = useState<string | null>(null);
   const country = user?.profile?.current_country || '';
   const city = user?.profile?.current_city || '';
   const [showCreate, setShowCreate] = useState(false);
@@ -70,6 +76,11 @@ export function ClassifiedsPage() {
     queryFn: () => api<Listing[]>(`/classifieds?${query}`),
   });
 
+  const { data: quota } = useQuery({
+    queryKey: ['classifieds-quota'],
+    queryFn: () => api<ClassifiedQuota>('/classifieds/quota'),
+  });
+
   const createListing = useMutation({
     mutationFn: () =>
       api('/classifieds', {
@@ -80,13 +91,16 @@ export function ClassifiedsPage() {
         }),
       }),
     onSuccess: () => {
+      setCreateError(null);
       qc.invalidateQueries({ queryKey: ['classifieds'] });
+      qc.invalidateQueries({ queryKey: ['classifieds-quota'] });
       setShowCreate(false);
       setForm({
         title: '', description: '', category: 'furniture', price: '', currency: 'USD',
         condition_label: 'used', city: city || '', country: country || 'US', contact_whatsapp: '',
       });
     },
+    onError: (err: Error) => setCreateError(err.message || t('classifieds.limitReached')),
   });
 
   const markSold = useMutation({
@@ -123,6 +137,11 @@ export function ClassifiedsPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-slate-900">{selected.title}</h1>
+                  {selected.is_featured && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                      {t('classifieds.featured')}
+                    </span>
+                  )}
                   {selected.status === 'sold' && (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
                       {t('classifieds.sold')}
@@ -208,11 +227,22 @@ export function ClassifiedsPage() {
             {t('classifieds.subtitle', { place: city || COUNTRY_LABELS[country] || t('home.yourArea') })}
           </p>
         </div>
-        <Button onClick={() => setShowCreate((v) => !v)}>
+        <Button onClick={() => { setCreateError(null); setShowCreate((v) => !v); }}>
           <Plus className="h-4 w-4" />
           {t('classifieds.create')}
         </Button>
       </div>
+
+      {quota && (
+        <p className="text-sm text-slate-500">
+          {t('classifieds.quota', { used: quota.used, max: quota.max })}
+          {!quota.can_create && (
+            <button type="button" className="ml-2 font-medium text-brand-700 hover:underline" onClick={() => navigate('/pricing')}>
+              {t('classifieds.upgradeQuota')}
+            </button>
+          )}
+        </p>
+      )}
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         <button
@@ -294,7 +324,18 @@ export function ClassifiedsPage() {
                 onChange={(e) => setForm({ ...form, contact_whatsapp: e.target.value })}
               />
             </div>
-            <Button disabled={!form.title.trim() || createListing.isPending} onClick={() => createListing.mutate()}>
+            {createError && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {createError}
+                <button type="button" className="ml-2 font-semibold underline" onClick={() => navigate('/pricing')}>
+                  {t('billing.goToPricing')}
+                </button>
+              </div>
+            )}
+            <Button
+              disabled={!form.title.trim() || createListing.isPending || quota?.can_create === false}
+              onClick={() => createListing.mutate()}
+            >
               {t('classifieds.publish')}
             </Button>
           </CardContent>
@@ -322,11 +363,18 @@ export function ClassifiedsPage() {
             >
               <div className="flex items-start justify-between gap-2">
                 <h2 className="line-clamp-2 font-semibold text-slate-900">{listing.title}</h2>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {listing.is_featured && (
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                      {t('classifieds.featured')}
+                    </span>
+                  )}
                 {!!listing.seller_verified && (
                   <span className="shrink-0 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">
                     {t('trust.verified')}
                   </span>
                 )}
+                </div>
               </div>
               <p className="mt-1 font-semibold text-brand-700">{formatPrice(listing)}</p>
               <p className="mt-1 text-xs text-slate-500">

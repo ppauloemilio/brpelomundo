@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { getMonetizationSettings, isSponsoredEvent } from '../lib/settings.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   const country = (req.query.country as string)?.trim();
   const city = (req.query.city as string)?.trim();
   const scope = ((req.query.scope as string) || 'upcoming').toLowerCase();
+  const mine = req.query.mine === '1';
 
   const profile = await db.get<{ current_country: string; current_city: string }>(
     'SELECT current_country, current_city FROM public_profiles WHERE user_id = ?',
@@ -25,7 +27,10 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   const conditions = ['e.is_active = 1', "UPPER(TRIM(e.country)) != 'BR'"];
   const params: string[] = [];
 
-  if (filterCountry && filterCountry.toUpperCase() !== 'BR') {
+  if (mine) {
+    conditions.push('e.organizer_id = ?');
+    params.push(req.user!.id);
+  } else if (filterCountry && filterCountry.toUpperCase() !== 'BR') {
     conditions.push('e.country = ?');
     params.push(filterCountry);
   }
@@ -37,6 +42,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
     conditions.push(`e.event_date >= substr(utc_now(), 1, 10)`);
   }
 
+  const settings = await getMonetizationSettings();
+
   const events = await db.all<Record<string, unknown> & { interested_by_me: number }>(
     `SELECT e.*, u.full_name AS organizer_name, u.username AS organizer_username, u.avatar_url AS organizer_avatar,
             CASE WHEN ei.user_id IS NOT NULL THEN 1 ELSE 0 END AS interested_by_me
@@ -45,6 +52,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
      LEFT JOIN event_interests ei ON ei.event_id = e.id AND ei.user_id = ?
      WHERE ${conditions.join(' AND ')}
      ORDER BY
+       CASE WHEN e.is_sponsored = 1 AND (e.sponsored_until IS NULL OR e.sponsored_until >= utc_now()) THEN 0 ELSE 1 END,
        CASE WHEN LOWER(TRIM(e.city)) = LOWER(?) THEN 0 ELSE 1 END,
        e.event_date ASC,
        e.event_time ASC
@@ -55,6 +63,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   res.json(events.map((e) => ({
     ...e,
     interested_by_me: !!e.interested_by_me,
+    is_sponsored: isSponsoredEvent(settings, e as { is_sponsored?: number; sponsored_until?: string | null }),
   })));
 });
 
@@ -117,7 +126,12 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
     [id, req.user!.id]
   );
 
-  res.json({ ...event, interested_by_me: !!interest });
+  const settings = await getMonetizationSettings();
+  res.json({
+    ...event,
+    interested_by_me: !!interest,
+    is_sponsored: isSponsoredEvent(settings, event as { is_sponsored?: number; sponsored_until?: string | null }),
+  });
 });
 
 router.post('/:id/interest', authMiddleware, async (req: AuthRequest, res) => {

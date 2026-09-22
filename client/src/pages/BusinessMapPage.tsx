@@ -46,6 +46,7 @@ type Business = {
   skills: string[];
   distance_km?: number;
   is_featured?: boolean;
+  is_local_featured?: boolean;
 };
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -271,7 +272,7 @@ export function BusinessMapPage() {
                       {b.name}
                       {monetization?.featured_business_enabled && b.is_featured && (
                         <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-                          {t('admin.featured')}
+                          {b.is_local_featured ? t('admin.localFeatured') : t('admin.featured')}
                         </span>
                       )}
                     </p>

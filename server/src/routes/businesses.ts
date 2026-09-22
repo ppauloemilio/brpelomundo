@@ -4,18 +4,21 @@ import { db } from '../db/sql.js';
 import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { paramId } from '../lib/params.js';
+import { isLocalFeaturedBusiness } from '../lib/settings.js';
 
 const router = Router();
 
-function mapBusinessRow(b: Record<string, unknown>) {
+function mapBusinessRow(b: Record<string, unknown>, viewerCity?: string) {
   const row = b as {
-    is_featured?: number; featured_until?: string | null; is_verified?: number;
+    is_featured?: number; featured_until?: string | null; featured_city?: string | null;
+    city?: string; is_verified?: number;
     skills: string; photos: string; social_links: string;
     rating_avg?: number; rating_count?: number;
   };
   return {
     ...b,
-    is_featured: !!row.is_featured && (!row.featured_until || new Date(row.featured_until) >= new Date()),
+    is_featured: isLocalFeaturedBusiness(row, viewerCity),
+    is_local_featured: !!(row.featured_city?.trim()),
     is_verified: !!row.is_verified,
     skills: parseJson(row.skills, []),
     photos: parseJson(row.photos, []),
@@ -25,12 +28,18 @@ function mapBusinessRow(b: Record<string, unknown>) {
   };
 }
 
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   const country = (req.query.country as string)?.trim();
   const category = (req.query.category as string)?.trim();
   const state = (req.query.state as string)?.trim();
   const city = (req.query.city as string)?.trim();
   const q = (req.query.q as string)?.trim();
+
+  const profile = await db.get<{ current_city: string }>(
+    'SELECT current_city FROM public_profiles WHERE user_id = ?',
+    [req.user!.id]
+  );
+  const viewerCity = city || profile?.current_city || '';
 
   const conditions = ['is_active = 1', "UPPER(TRIM(country)) != 'BR'"];
   const params: string[] = [];
@@ -62,14 +71,16 @@ router.get('/', authMiddleware, async (req, res) => {
        (SELECT COUNT(*) FROM reviews r WHERE r.target_type = 'business' AND r.target_id = b.id AND r.is_active = 1) AS rating_count
      FROM businesses b WHERE ${conditions.join(' AND ')}
      ORDER BY
-       CASE WHEN is_featured = 1 AND (featured_until IS NULL OR featured_until >= utc_now()) THEN 0 ELSE 1 END,
+       CASE WHEN is_featured = 1 AND (featured_until IS NULL OR featured_until >= utc_now())
+            AND (featured_city IS NULL OR TRIM(featured_city) = '' OR LOWER(TRIM(featured_city)) = LOWER(?))
+            THEN 0 ELSE 1 END,
        featured_order ASC,
        created_at DESC
      LIMIT 100`,
-    params
+    [...params, viewerCity]
   );
 
-  res.json(businesses.map(mapBusinessRow));
+  res.json(businesses.map((b) => mapBusinessRow(b, viewerCity)));
 });
 
 router.get('/mine', authMiddleware, async (req: AuthRequest, res) => {

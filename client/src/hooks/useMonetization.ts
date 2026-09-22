@@ -6,6 +6,8 @@ export type MonetizationSettings = {
   featured_business_enabled: boolean;
   paid_posts_enabled: boolean;
   premium_profile_enabled: boolean;
+  classifieds_paid_enabled: boolean;
+  sponsored_events_enabled: boolean;
 };
 
 export function useMonetization() {

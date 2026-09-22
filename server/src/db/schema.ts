@@ -57,6 +57,7 @@ export const SCHEMA = `
     interests TEXT DEFAULT '[]',
     is_premium INTEGER DEFAULT 0,
     premium_until TEXT,
+    extra_classified_slots INTEGER DEFAULT 0,
     onboarding_completed INTEGER DEFAULT 0
   );
 
@@ -121,6 +122,7 @@ export const SCHEMA = `
     is_active INTEGER DEFAULT 1,
     is_featured INTEGER DEFAULT 0,
     featured_until TEXT,
+    featured_city TEXT,
     featured_order INTEGER DEFAULT 0,
     is_verified INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT utc_now()
@@ -304,6 +306,8 @@ export const SCHEMA = `
     whatsapp TEXT DEFAULT '',
     external_link TEXT DEFAULT '',
     interest_count INTEGER DEFAULT 0,
+    is_sponsored INTEGER DEFAULT 0,
+    sponsored_until TEXT,
     is_active INTEGER DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT utc_now()
   );
@@ -330,6 +334,8 @@ export const SCHEMA = `
     contact_whatsapp TEXT DEFAULT '',
     seller_id TEXT NOT NULL REFERENCES users(id),
     status TEXT NOT NULL DEFAULT 'active',
+    is_featured INTEGER DEFAULT 0,
+    featured_until TEXT,
     is_active INTEGER DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT utc_now()
   );
@@ -442,4 +448,13 @@ export const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_billing_orders_user ON billing_orders(user_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_billing_orders_status ON billing_orders(status, paid_at);
   CREATE INDEX IF NOT EXISTS idx_ad_events_ad ON ad_events(ad_id, event_type, created_at);
+
+  CREATE TABLE IF NOT EXISTS profile_views (
+    id TEXT PRIMARY KEY,
+    profile_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    viewer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    viewed_at TEXT NOT NULL DEFAULT utc_now()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_profile_views_profile ON profile_views(profile_user_id, viewed_at);
 `;

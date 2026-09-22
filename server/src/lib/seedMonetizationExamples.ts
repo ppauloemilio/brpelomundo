@@ -10,6 +10,8 @@ export async function applyMonetizationExamples() {
     featured_business_enabled: true,
     paid_posts_enabled: true,
     premium_profile_enabled: true,
+    classifieds_paid_enabled: true,
+    sponsored_events_enabled: true,
   });
 
   await db.run(

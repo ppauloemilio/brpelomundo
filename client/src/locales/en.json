@@ -125,6 +125,10 @@
     "back": "Back",
     "empty": "No listings in this area yet.",
     "emptyHint": "Publish the first classified in your city.",
+    "featured": "Featured",
+    "quota": "{{used}} of {{max}} active listings",
+    "upgradeQuota": "See plans",
+    "limitReached": "Active listing limit reached.",
     "category": {
       "furniture": "Furniture",
       "electronics": "Electronics",
@@ -205,6 +209,7 @@
     "interested": "Interested",
     "interestedCount": "{{count}} interested",
     "organizedBy": "By {{name}}",
+    "sponsored": "Sponsored",
     "empty": "No events found.",
     "emptyHint": "Create the first community meetup."
   },
@@ -241,7 +246,8 @@
     "share": "Share",
     "comments": "Comments",
     "writeComment": "Write a comment...",
-    "promoted": "Featured"
+    "promoted": "Featured",
+    "hiring": "Hiring"
   },
   "post": {
     "newPost": "New Post",
@@ -399,7 +405,8 @@
     "joined": "Joined in",
     "noSkills": "No skills added yet.",
     "years": "years",
-    "premiumOwnerHint": "You have a Premium profile — your name is highlighted for others in Explore."
+    "premiumOwnerHint": "Premium active: profile badge, Explore priority, and up to 3 free classifieds.",
+    "profileViews30d": "{{count}} profile visits in the last 30 days"
   },
   "explore": {
     "title": "Explore",
@@ -422,7 +429,7 @@
     "adminHint": "Manage users, posts, businesses and monetization",
     "premiumActive": "Your account is on the Premium plan.",
     "premiumPlan": "Premium profile",
-    "premiumBenefits": "Profile badge, priority in Explore, and highlight for visitors to your profile.",
+    "premiumBenefits": "Profile badge, Explore priority, visit stats, and up to 3 active classifieds.",
     "upgradePremium": "Subscribe or renew",
     "manageBilling": "Manage plans and payments"
   },
@@ -444,7 +451,10 @@
     "promoteBusinessTitle": "Paid map featuring",
     "promoteBusinessHint": "Pick the “Featured business” plan on the pricing page to appear first on the map.",
     "goToPricing": "View plans and pay",
-    "promoCode": "Discount coupon (optional)"
+    "promoCode": "Discount coupon (optional)",
+    "selectJob": "Select the job post",
+    "selectClassified": "Select the listing",
+    "selectEvent": "Select the event"
   },
   "editProfile": {
     "title": "Edit Profile",
@@ -582,7 +592,12 @@
     "paidPostsEnabled": "Featured jobs and events",
     "paidPostsHint": "Promoted posts appear at the top of the feed",
     "premiumEnabled": "Premium professional profile",
-    "premiumHint": "Premium badge and priority in Explore",
+    "premiumHint": "Premium badge, Explore priority, and visit stats",
+    "classifiedsPaidEnabled": "Paid classifieds",
+    "classifiedsPaidHint": "Free listing limits and featured listing plans",
+    "sponsoredEventsEnabled": "Sponsored events",
+    "sponsoredEventsHint": "Paid events appear at the top of the list",
+    "localFeatured": "Local featured",
     "examplesTitle": "Demo examples",
     "examplesHint": "Enables all monetization and applies: banner on Feed, featured “Sabor do Brasil” on Map, promoted post on Feed, and Premium for Ana (your profile) and Beatriz.",
     "applyExamples": "Apply monetization examples",

@@ -50,7 +50,7 @@ function formatUser(
 }
 
 async function profileStats(userId: string) {
-  const [followers, following, friends, posts, rating] = await Promise.all([
+  const [followers, following, friends, posts, rating, views30] = await Promise.all([
     db.get<{ c: number }>('SELECT COUNT(*) as c FROM follows WHERE following_id = ?', [userId]),
     db.get<{ c: number }>('SELECT COUNT(*) as c FROM follows WHERE follower_id = ?', [userId]),
     db.get<{ c: number }>(
@@ -67,6 +67,11 @@ async function profileStats(userId: string) {
        FROM reviews WHERE target_type = 'user' AND target_id = ? AND is_active = 1`,
       [userId]
     ),
+    db.get<{ c: number }>(
+      `SELECT COUNT(DISTINCT viewer_id) AS c FROM profile_views
+       WHERE profile_user_id = ? AND viewed_at >= utc_now(interval '-30 days')`,
+      [userId]
+    ),
   ]);
   return {
     followers_count: followers?.c ?? 0,
@@ -75,7 +80,24 @@ async function profileStats(userId: string) {
     posts_count: posts?.c ?? 0,
     rating_avg: Number(rating?.avg_rating || 0),
     rating_count: rating?.rating_count || 0,
+    profile_views_30d: views30?.c ?? 0,
   };
+}
+
+async function recordProfileView(profileUserId: string, viewerId: string) {
+  if (profileUserId === viewerId) return;
+  const recent = await db.get(
+    `SELECT id FROM profile_views
+     WHERE profile_user_id = ? AND viewer_id = ?
+       AND viewed_at >= utc_now(interval '-24 hours')
+     LIMIT 1`,
+    [profileUserId, viewerId]
+  );
+  if (recent) return;
+  await db.run(
+    'INSERT INTO profile_views (id, profile_user_id, viewer_id) VALUES (?, ?, ?)',
+    [uuid(), profileUserId, viewerId]
+  );
 }
 
 async function friendshipStatus(viewerId: string, profileId: string) {
@@ -194,6 +216,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
   ]);
 
   if (req.user!.id !== user.id) {
+    await recordProfileView(user.id, req.user!.id);
     const [isFollowing, friendship] = await Promise.all([
       db.get('SELECT id FROM follows WHERE follower_id = ? AND following_id = ?', [
         req.user!.id,

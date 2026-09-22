@@ -125,6 +125,10 @@
     "back": "Voltar",
     "empty": "Nenhum anúncio nesta região.",
     "emptyHint": "Publique o primeiro classificado da sua cidade.",
+    "featured": "Destaque",
+    "quota": "{{used}} de {{max}} anúncios ativos",
+    "upgradeQuota": "Ver planos",
+    "limitReached": "Limite de anúncios ativos atingido.",
     "category": {
       "furniture": "Móveis",
       "electronics": "Eletrônicos",
@@ -205,6 +209,7 @@
     "interested": "Interessado",
     "interestedCount": "{{count}} interessados",
     "organizedBy": "Por {{name}}",
+    "sponsored": "Patrocinado",
     "empty": "Nenhum evento encontrado.",
     "emptyHint": "Crie o primeiro encontro da comunidade."
   },
@@ -241,7 +246,8 @@
     "share": "Compartilhar",
     "comments": "Comentários",
     "writeComment": "Escreva um comentário...",
-    "promoted": "Destaque"
+    "promoted": "Destaque",
+    "hiring": "Contratando"
   },
   "post": {
     "newPost": "Nova Publicação",
@@ -399,7 +405,8 @@
     "joined": "Entrou em",
     "noSkills": "Nenhuma habilidade cadastrada.",
     "years": "anos",
-    "premiumOwnerHint": "Você tem perfil Premium — seu nome aparece com destaque para outros usuários no Explorar."
+    "premiumOwnerHint": "Premium ativo: badge no perfil, prioridade no Explorar e até 3 classificados gratuitos.",
+    "profileViews30d": "{{count}} visitas ao seu perfil nos últimos 30 dias"
   },
   "explore": {
     "title": "Explorar",
@@ -422,7 +429,7 @@
     "adminHint": "Gestão de usuários, publicações, empresas e monetização",
     "premiumActive": "Sua conta está no plano Premium.",
     "premiumPlan": "Perfil Premium",
-    "premiumBenefits": "Badge no perfil, prioridade no Explorar e destaque para quem visita seu perfil.",
+    "premiumBenefits": "Badge no perfil, prioridade no Explorar, estatísticas de visitas e até 3 classificados ativos.",
     "upgradePremium": "Assinar ou renovar",
     "manageBilling": "Gerenciar planos e pagamentos"
   },
@@ -444,7 +451,10 @@
     "promoteBusinessTitle": "Destaque pago no mapa",
     "promoteBusinessHint": "Escolha o plano “Negócio em destaque” na página de planos para aparecer primeiro no mapa.",
     "goToPricing": "Ver planos e pagar",
-    "promoCode": "Cupom de desconto (opcional)"
+    "promoCode": "Cupom de desconto (opcional)",
+    "selectJob": "Selecione a vaga",
+    "selectClassified": "Selecione o classificado",
+    "selectEvent": "Selecione o evento"
   },
   "editProfile": {
     "title": "Editar Perfil",
@@ -582,7 +592,12 @@
     "paidPostsEnabled": "Vagas e eventos em destaque",
     "paidPostsHint": "Posts promovidos aparecem no topo do feed",
     "premiumEnabled": "Perfil profissional premium",
-    "premiumHint": "Badge premium e prioridade no Explorar",
+    "premiumHint": "Badge premium, prioridade no Explorar e estatísticas de visitas",
+    "classifiedsPaidEnabled": "Classificados pagos",
+    "classifiedsPaidHint": "Limite gratuito de anúncios e planos de destaque",
+    "sponsoredEventsEnabled": "Eventos patrocinados",
+    "sponsoredEventsHint": "Eventos pagos aparecem em destaque na lista",
+    "localFeatured": "Destaque local",
     "examplesTitle": "Exemplos demo",
     "examplesHint": "Ativa todas as monetizações e aplica: banner no Feed, “Sabor do Brasil” em destaque no Mapa, post promovido no Feed e Premium na Ana (seu perfil) e na Beatriz.",
     "applyExamples": "Aplicar exemplos de monetização",

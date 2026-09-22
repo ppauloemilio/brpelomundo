@@ -42,6 +42,7 @@ export type ProfileData = {
   email_verified?: boolean;
   rating_avg?: number;
   rating_count?: number;
+  profile_views_30d?: number;
 };
 
 type Tab = 'posts' | 'skills' | 'businesses' | 'friends';
@@ -228,8 +229,13 @@ export function ProfileView({
         )}
       >
         {isOwner && user.is_premium && (
-          <div className="mt-4 flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
-            {t('profile.premiumOwnerHint')}
+          <div className="mt-4 space-y-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
+            <p>{t('profile.premiumOwnerHint')}</p>
+            {typeof user.profile_views_30d === 'number' && (
+              <p className="text-xs text-brand-700">
+                {t('profile.profileViews30d', { count: user.profile_views_30d })}
+              </p>
+            )}
           </div>
         )}
         {user.bio && (

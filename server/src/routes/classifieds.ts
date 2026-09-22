@@ -3,6 +3,8 @@ import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
+import { getMonetizationSettings, isFeaturedClassified } from '../lib/settings.js';
+import { classifiedLimitMessage, getClassifiedQuota } from '../lib/classifiedsQuota.js';
 
 const router = Router();
 
@@ -15,12 +17,16 @@ function paramId(raw: string | string[]): string {
   return Array.isArray(raw) ? raw[0] : raw;
 }
 
-function mapListing(row: Record<string, unknown>) {
+function mapListing(row: Record<string, unknown>, settings?: Awaited<ReturnType<typeof getMonetizationSettings>>) {
+  const featured = settings
+    ? isFeaturedClassified(settings, row as { is_featured?: number; featured_until?: string | null })
+    : !!row.is_featured;
   return {
     ...row,
     photos: parseJson((row.photos as string) || '[]', [] as string[]),
     rating_avg: Number(row.rating_avg || 0),
     rating_count: Number(row.rating_count || 0),
+    is_featured: featured,
   };
 }
 
@@ -30,6 +36,10 @@ function ratingSubquery() {
           (SELECT COUNT(*) FROM reviews r
            WHERE r.target_type = 'classified' AND r.target_id = c.id AND r.is_active = 1) AS rating_count`;
 }
+
+router.get('/quota', authMiddleware, async (req: AuthRequest, res) => {
+  res.json(await getClassifiedQuota(req.user!.id));
+});
 
 router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   const country = (req.query.country as string)?.trim();
@@ -73,6 +83,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
     params.push(`%${q}%`, `%${q}%`);
   }
 
+  const settings = await getMonetizationSettings();
+
   const listings = await db.all<Record<string, unknown>>(
     `SELECT c.*, u.full_name AS seller_name, u.username AS seller_username, u.avatar_url AS seller_avatar,
             u.is_verified AS seller_verified,
@@ -81,6 +93,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
      JOIN users u ON u.id = c.seller_id
      WHERE ${conditions.join(' AND ')}
      ORDER BY
+       CASE WHEN c.is_featured = 1 AND (c.featured_until IS NULL OR c.featured_until >= utc_now()) THEN 0 ELSE 1 END,
        CASE WHEN LOWER(TRIM(c.city)) = LOWER(?) THEN 0 ELSE 1 END,
        CASE WHEN c.status = 'active' THEN 0 ELSE 1 END,
        c.created_at DESC
@@ -88,7 +101,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
     [...params, (profile?.current_city || '').trim()]
   );
 
-  res.json(listings.map((row) => mapListing(row)));
+  res.json(listings.map((row) => mapListing(row, settings)));
 });
 
 router.get('/categories', authMiddleware, (_req, res) => {
@@ -107,7 +120,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
     [id]
   );
   if (!row) return res.status(404).json({ error: 'Anúncio não encontrado' });
-  res.json(mapListing(row));
+  res.json(mapListing(row, await getMonetizationSettings()));
 });
 
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
@@ -121,6 +134,16 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   }
   if (!CATEGORIES.includes(category)) {
     return res.status(400).json({ error: 'Categoria inválida' });
+  }
+
+  const settings = await getMonetizationSettings();
+  const quota = await getClassifiedQuota(req.user!.id);
+  if (!quota.can_create) {
+    return res.status(402).json({
+      error: classifiedLimitMessage(settings, quota),
+      code: 'classified_limit',
+      quota,
+    });
   }
 
   const id = uuid();
@@ -151,7 +174,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
      FROM classifieds c JOIN users u ON u.id = c.seller_id WHERE c.id = ?`,
     [id]
   );
-  res.status(201).json(mapListing(row!));
+  res.status(201).json(mapListing(row!, settings));
 });
 
 router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
@@ -212,7 +235,7 @@ router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
      FROM classifieds c JOIN users u ON u.id = c.seller_id WHERE c.id = ?`,
     [id]
   );
-  res.json(mapListing(row!));
+  res.json(mapListing(row!, await getMonetizationSettings()));
 });
 
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {

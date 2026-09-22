@@ -157,6 +157,18 @@ export function MonetizationSection() {
             label={t('admin.premiumEnabled')}
             hint={t('admin.premiumHint')}
           />
+          <AdminToggle
+            checked={settings.classifieds_paid_enabled}
+            onChange={(v) => saveSettings.mutate({ classifieds_paid_enabled: v })}
+            label={t('admin.classifiedsPaidEnabled')}
+            hint={t('admin.classifiedsPaidHint')}
+          />
+          <AdminToggle
+            checked={settings.sponsored_events_enabled}
+            onChange={(v) => saveSettings.mutate({ sponsored_events_enabled: v })}
+            label={t('admin.sponsoredEventsEnabled')}
+            hint={t('admin.sponsoredEventsHint')}
+          />
           <div className="border-t border-slate-100 pt-4">
             <p className="mb-2 text-sm font-medium text-slate-700">{t('admin.examplesTitle')}</p>
             <p className="mb-3 text-xs text-slate-500">{t('admin.examplesHint')}</p>

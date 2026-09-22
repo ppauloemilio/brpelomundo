@@ -22,6 +22,7 @@ type CommunityEvent = {
   country: string;
   interest_count: number;
   interested_by_me: boolean;
+  is_sponsored?: boolean;
   organizer_name: string;
   whatsapp?: string;
   external_link?: string;
@@ -148,7 +149,14 @@ export function EventsPage() {
                     <Calendar className="h-4 w-4" />
                     {formatDate(ev.event_date, ev.event_time)}
                   </p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">{ev.title}</h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold text-slate-900">{ev.title}</h2>
+                    {ev.is_sponsored && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-violet-800">
+                        {t('events.sponsored')}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
                     <MapPin className="h-3.5 w-3.5" />
                     {[ev.location_name, ev.city].filter(Boolean).join(' · ')}

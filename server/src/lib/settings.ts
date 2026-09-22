@@ -6,6 +6,8 @@ export type MonetizationSettings = {
   featured_business_enabled: boolean;
   paid_posts_enabled: boolean;
   premium_profile_enabled: boolean;
+  classifieds_paid_enabled: boolean;
+  sponsored_events_enabled: boolean;
 };
 
 export const DEFAULT_MONETIZATION: MonetizationSettings = {
@@ -13,6 +15,8 @@ export const DEFAULT_MONETIZATION: MonetizationSettings = {
   featured_business_enabled: false,
   paid_posts_enabled: false,
   premium_profile_enabled: false,
+  classifieds_paid_enabled: false,
+  sponsored_events_enabled: false,
 };
 
 const SETTINGS_KEY = 'monetization';
@@ -62,4 +66,41 @@ export function isPremiumProfile(
   if (!profile?.is_premium) return false;
   if (profile.premium_until && new Date(profile.premium_until) < new Date()) return false;
   return true;
+}
+
+export function isFeaturedClassified(
+  settings: MonetizationSettings,
+  row: { is_featured?: number | boolean; featured_until?: string | null }
+) {
+  if (!settings.classifieds_paid_enabled) return false;
+  if (!row.is_featured) return false;
+  if (row.featured_until && new Date(row.featured_until) < new Date()) return false;
+  return true;
+}
+
+export function isSponsoredEvent(
+  settings: MonetizationSettings,
+  row: { is_sponsored?: number | boolean; sponsored_until?: string | null }
+) {
+  if (!settings.sponsored_events_enabled) return false;
+  if (!row.is_sponsored) return false;
+  if (row.sponsored_until && new Date(row.sponsored_until) < new Date()) return false;
+  return true;
+}
+
+export function isLocalFeaturedBusiness(
+  row: {
+    is_featured?: number | boolean;
+    featured_until?: string | null;
+    featured_city?: string | null;
+    city?: string | null;
+  },
+  viewerCity?: string
+) {
+  const featured = !!row.is_featured && (!row.featured_until || new Date(row.featured_until) >= new Date());
+  if (!featured) return false;
+  const scope = (row.featured_city || '').trim();
+  if (!scope) return true;
+  const city = (viewerCity || row.city || '').trim();
+  return scope.toLowerCase() === city.toLowerCase();
 }

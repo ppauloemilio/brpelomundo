@@ -25,7 +25,9 @@ type Plan = {
 };
 
 type Business = { id: string; name: string };
-type Post = { id: string; content: string; created_at: string };
+type Post = { id: string; content: string; created_at: string; type?: string };
+type Listing = { id: string; title: string };
+type CommunityEvent = { id: string; title: string; event_date: string };
 
 function formatMoney(cents: number, currency: string) {
   try {
@@ -67,6 +69,16 @@ export function PricingPage() {
     enabled: !!user?.id,
   });
 
+  const { data: myClassifieds = [] } = useQuery({
+    queryKey: ['classifieds-mine'],
+    queryFn: () => api<Listing[]>('/classifieds?mine=1&status=all'),
+  });
+
+  const { data: myEvents = [] } = useQuery({
+    queryKey: ['events-mine'],
+    queryFn: () => api<CommunityEvent[]>('/events?mine=1&scope=all'),
+  });
+
   const { data: orders = [] } = useQuery({
     queryKey: ['billing-orders'],
     queryFn: () => api<Array<{ id: string; plan_name: string; amount_cents: number; currency: string; status: string; paid_at: string; ends_at: string }>>('/billing/orders'),
@@ -75,8 +87,12 @@ export function PricingPage() {
   const plan = useMemo(() => plans.find((p) => p.code === selected), [plans, selected]);
   const payCents = plan?.effective_price_cents ?? plan?.price_cents ?? 0;
 
-  const needsBusiness = plan?.product_type === 'featured_business';
+  const needsBusiness = plan?.product_type === 'featured_business' || plan?.product_type === 'local_business';
   const needsPost = plan?.product_type === 'promoted_post';
+  const needsJob = plan?.product_type === 'promoted_job';
+  const needsClassified = plan?.product_type === 'classified_featured';
+  const needsEvent = plan?.product_type === 'sponsored_event';
+  const jobPosts = myPosts.filter((p) => p.type === 'job');
 
   const checkout = useMutation({
     mutationFn: () =>
@@ -99,6 +115,10 @@ export function PricingPage() {
       qc.invalidateQueries({ queryKey: ['posts'] });
       qc.invalidateQueries({ queryKey: ['businesses'] });
       qc.invalidateQueries({ queryKey: ['profile'] });
+      qc.invalidateQueries({ queryKey: ['classifieds'] });
+      qc.invalidateQueries({ queryKey: ['events'] });
+      qc.invalidateQueries({ queryKey: ['classifieds-mine'] });
+      qc.invalidateQueries({ queryKey: ['events-mine'] });
     },
     onError: (err: Error) => {
       setDoneMsg(null);
@@ -110,7 +130,10 @@ export function PricingPage() {
     !!plan &&
     cardNumber.replace(/\D/g, '').length >= 12 &&
     (!needsBusiness || !!targetId) &&
-    (!needsPost || !!targetId);
+    (!needsPost || !!targetId) &&
+    (!needsJob || !!targetId) &&
+    (!needsClassified || !!targetId) &&
+    (!needsEvent || !!targetId);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
@@ -203,10 +226,51 @@ export function PricingPage() {
               onChange={(e) => setTargetId(e.target.value)}
             >
               <option value="">{t('billing.selectPost')}</option>
-              {myPosts.slice(0, 20).map((p) => (
+              {myPosts.filter((p) => p.type !== 'job').slice(0, 20).map((p) => (
                 <option key={p.id} value={p.id}>
                   {(p.content || '').slice(0, 60) || p.id}
                 </option>
+              ))}
+            </select>
+          )}
+
+          {needsJob && (
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+            >
+              <option value="">{t('billing.selectJob')}</option>
+              {jobPosts.slice(0, 20).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {(p.content || '').slice(0, 60) || p.id}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {needsClassified && (
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+            >
+              <option value="">{t('billing.selectClassified')}</option>
+              {myClassifieds.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+          )}
+
+          {needsEvent && (
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+            >
+              <option value="">{t('billing.selectEvent')}</option>
+              {myEvents.map((e) => (
+                <option key={e.id} value={e.id}>{e.title}</option>
               ))}
             </select>
           )}

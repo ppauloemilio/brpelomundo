@@ -66,6 +66,7 @@ async function main() {
 
   const me = await call({ path: '/api/auth/me' });
   const userId: string = me?.id ?? '';
+  const bioBefore: string = me?.profile?.bio ?? '';
 
   const feed = await call({ path: '/api/posts?scope=city' });
   const firstPostId: string = feed?.[0]?.id ?? '';
@@ -234,7 +235,8 @@ async function main() {
     }
   }
 
-  await call({ path: '/api/users/me/profile', method: 'PATCH', body: { bio: 'smoke' } });
+  await call({ path: '/api/users/me/profile', method: 'PATCH', body: { bio: bioBefore || 'smoke test' } });
+  await call({ path: '/api/users/me/profile', method: 'PATCH', body: { bio: bioBefore } });
   await call({
     path: '/api/users/me/skills',
     method: 'POST',
