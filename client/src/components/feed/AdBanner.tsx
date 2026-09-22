@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, assetUrl } from '@/lib/api';
 import { useMonetization } from '@/hooks/useMonetization';
+import { useRotatedAd } from '@/hooks/useRotatedAd';
 
 type Ad = { id: string; title: string; image_url: string; link_url?: string; description?: string };
 
@@ -15,7 +16,7 @@ export function AdBanner({ placement = 'feed' }: { placement?: string }) {
     enabled: settings?.ads_enabled,
   });
 
-  const ad = ads[0];
+  const ad = useRotatedAd(ads);
 
   useEffect(() => {
     if (!ad?.id || tracked.current === ad.id) return;

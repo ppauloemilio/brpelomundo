@@ -36,7 +36,7 @@ router.get('/advertisements', async (_req, res) => {
      AND (owner_id IS NULL OR creative_configured = 1)
      AND (start_date IS NULL OR start_date <= utc_day())
      AND (end_date IS NULL OR end_date >= utc_day())
-     ORDER BY order_num ASC`
+     ORDER BY order_num ASC, id ASC`
   );
   res.json(ads);
 });
