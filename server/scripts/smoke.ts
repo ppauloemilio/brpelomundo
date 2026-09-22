@@ -127,6 +127,7 @@ async function main() {
     { path: '/api/geo/cities?country=US&state=NY' },
     { path: '/api/billing/plans' },
     { path: '/api/billing/orders' },
+    { path: '/api/billing/ad-campaigns' },
     // admin (ana@demo.com é promovida a admin no setup)
     { path: '/api/admin/stats' },
     { path: '/api/admin/settings' },

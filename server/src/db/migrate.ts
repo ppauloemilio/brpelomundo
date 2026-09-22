@@ -84,6 +84,9 @@ export async function migrateSchema() {
 
     ALTER TABLE public_profiles ADD COLUMN IF NOT EXISTS extra_classified_slots INTEGER DEFAULT 0;
 
+    ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS owner_id TEXT REFERENCES users(id);
+    ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS creative_configured INTEGER DEFAULT 0;
+
     CREATE TABLE IF NOT EXISTS profile_views (
       id TEXT PRIMARY KEY,
       profile_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -95,6 +98,22 @@ export async function migrateSchema() {
   `);
   await migrateBillingPlans();
   await restoreSmokeTestBio();
+  await backfillAdCampaignOwners();
+}
+
+async function backfillAdCampaignOwners() {
+  await db.run(`
+    UPDATE advertisements a
+    SET owner_id = o.user_id
+    FROM billing_orders o
+    WHERE o.target_type = 'advertisement'
+      AND o.target_id = a.id
+      AND a.owner_id IS NULL
+  `);
+  await db.run(`
+    UPDATE advertisements SET creative_configured = 1
+    WHERE owner_id IS NULL AND COALESCE(creative_configured, 0) = 0
+  `);
 }
 
 /** Bios sobrescritas pelo smoke test antigo — restaura texto demo. */

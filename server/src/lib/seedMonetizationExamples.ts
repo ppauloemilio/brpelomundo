@@ -45,8 +45,9 @@ export async function applyMonetizationExamples() {
   );
   if ((activeAds?.c ?? 0) === 0) {
     await db.run(
-      `INSERT INTO advertisements (id, title, image_url, link_url, description, is_active, order_num)
-       VALUES (?, ?, ?, ?, ?, 1, 1)`,
+      `INSERT INTO advertisements (
+         id, title, image_url, link_url, description, creative_configured, is_active, order_num
+       ) VALUES (?, ?, ?, ?, ?, 1, 1, 1)`,
       [
         uuid(),
         'Patrocinado — Comunidade Brasil',

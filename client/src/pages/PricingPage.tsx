@@ -8,6 +8,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
+import {
+  AdCampaignCheckoutFields,
+  AdCampaignPanel,
+  emptyAdCampaignForm,
+} from '@/components/billing/AdCampaignPanel';
 
 type Plan = {
   id: string;
@@ -52,6 +57,7 @@ export function PricingPage() {
   const [promoCode, setPromoCode] = useState('');
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [adCreative, setAdCreative] = useState(emptyAdCampaignForm());
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['billing-plans'],
@@ -92,24 +98,41 @@ export function PricingPage() {
   const needsJob = plan?.product_type === 'promoted_job';
   const needsClassified = plan?.product_type === 'classified_featured';
   const needsEvent = plan?.product_type === 'sponsored_event';
+  const needsAdCampaign = plan?.product_type === 'ad_campaign';
   const jobPosts = myPosts.filter((p) => p.type === 'job');
+  const hasAdCreative = !!(adCreative.title.trim() && adCreative.image_url.trim());
 
   const checkout = useMutation({
     mutationFn: () =>
-      api<{ message?: string }>('/billing/checkout', {
+      api<{ message?: string; activated?: { needs_creative?: boolean } }>('/billing/checkout', {
         method: 'POST',
         body: JSON.stringify({
           plan_code: selected,
           target_id: targetId || undefined,
           card_last4: cardNumber.replace(/\D/g, '').slice(-4),
           promo_code: promoCode.trim() || undefined,
+          ad_creative: hasAdCreative
+            ? {
+                title: adCreative.title.trim(),
+                image_url: adCreative.image_url.trim(),
+                link_url: adCreative.link_url.trim() || undefined,
+                description: adCreative.description.trim() || undefined,
+              }
+            : undefined,
         }),
       }),
-    onSuccess: async (res: { message?: string }) => {
+    onSuccess: async (res) => {
       setError(null);
-      setDoneMsg(res.message || t('billing.success'));
+      const msg =
+        res.activated?.needs_creative
+          ? t('billing.adCampaignPurchasedSetup')
+          : res.message || t('billing.success');
+      setDoneMsg(msg);
+      setAdCreative(emptyAdCampaignForm());
       await refreshUser();
       qc.invalidateQueries({ queryKey: ['billing-orders'] });
+      qc.invalidateQueries({ queryKey: ['billing-ad-campaigns'] });
+      qc.invalidateQueries({ queryKey: ['advertisements'] });
       qc.invalidateQueries({ queryKey: ['monetization-settings'] });
       qc.invalidateQueries({ queryKey: ['my-businesses'] });
       qc.invalidateQueries({ queryKey: ['posts'] });
@@ -160,6 +183,7 @@ export function PricingPage() {
               onClick={() => {
                 setSelected(p.code);
                 setTargetId('');
+                setAdCreative(emptyAdCampaignForm());
                 setDoneMsg(null);
                 setError(null);
               }}
@@ -275,6 +299,10 @@ export function PricingPage() {
             </select>
           )}
 
+          {needsAdCampaign && (
+            <AdCampaignCheckoutFields form={adCreative} onChange={setAdCreative} />
+          )}
+
           <Input
             placeholder={t('billing.cardName')}
             value={cardName}
@@ -305,6 +333,8 @@ export function PricingPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <AdCampaignPanel />
 
       {orders.length > 0 && (
         <Card>

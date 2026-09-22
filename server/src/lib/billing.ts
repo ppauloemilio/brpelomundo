@@ -34,6 +34,13 @@ export type PublicPlan = BillingPlan & {
   promo_badge?: string | null;
 };
 
+export type AdCreativeInput = {
+  title: string;
+  image_url: string;
+  link_url?: string;
+  description?: string;
+};
+
 export type CheckoutInput = {
   userId: string;
   planCode: string;
@@ -41,7 +48,11 @@ export type CheckoutInput = {
   paymentProvider?: 'demo' | 'admin_comp';
   cardLast4?: string;
   promoCode?: string;
+  adCreative?: AdCreativeInput;
 };
+
+const AD_PLACEHOLDER_IMAGE =
+  'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=800&q=80';
 
 export type Promotion = {
   id: string;
@@ -171,7 +182,8 @@ async function activateEntitlement(
   userId: string,
   plan: BillingPlan,
   targetId: string | undefined,
-  endsAt: string
+  endsAt: string,
+  adCreative?: AdCreativeInput
 ) {
   await ensureToggleForProduct(plan.product_type);
 
@@ -267,31 +279,44 @@ async function activateEntitlement(
   }
 
   if (plan.product_type === 'ad_campaign') {
-    // Creates a placeholder campaign ad owned via metadata; admin can refine creative later.
     const adId = targetId || uuid();
     const endDay = isoDay(addDays(plan.duration_days));
+    const creative = adCreative;
+    const configured = !!(creative?.title?.trim() && creative?.image_url?.trim());
+    const title = configured ? creative!.title.trim() : 'Campanha patrocinada';
+    const imageUrl = configured ? creative!.image_url.trim() : AD_PLACEHOLDER_IMAGE;
+    const linkUrl = configured ? (creative!.link_url?.trim() || '') : '';
+    const description = configured
+      ? (creative!.description?.trim() || '')
+      : 'Configure seu banner em Planos e cobrança.';
+
     const existing = await db.get('SELECT id FROM advertisements WHERE id = ?', [adId]);
     if (!existing) {
       await db.run(
-        `INSERT INTO advertisements (id, title, image_url, link_url, description, is_active, order_num, start_date, end_date)
-         VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)`,
+        `INSERT INTO advertisements (
+           id, title, image_url, link_url, description, owner_id, creative_configured,
+           is_active, order_num, start_date, end_date
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)`,
         [
           adId,
-          'Campanha patrocinada',
-          'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=800&q=80',
-          '',
-          `Campanha comprada por usuário ${userId}`,
+          title,
+          imageUrl,
+          linkUrl,
+          description,
+          userId,
+          configured ? 1 : 0,
           isoDay(new Date()),
           endDay,
         ]
       );
     } else {
-      await db.run(`UPDATE advertisements SET is_active = 1, end_date = ? WHERE id = ?`, [
-        endDay,
-        adId,
-      ]);
+      await db.run(
+        `UPDATE advertisements SET is_active = 1, end_date = ?, owner_id = COALESCE(owner_id, ?)
+         WHERE id = ?`,
+        [endDay, userId, adId]
+      );
     }
-    return { target_type: 'advertisement', target_id: adId, ends_at: endsAt };
+    return { target_type: 'advertisement', target_id: adId, ends_at: endsAt, needs_creative: !configured };
   }
 
   throw new Error('Tipo de plano não suportado');
@@ -368,7 +393,13 @@ export async function checkoutPlan(input: CheckoutInput) {
 
   let activation: { target_type: string; target_id: string; ends_at: string };
   try {
-    activation = await activateEntitlement(input.userId, plan, input.targetId, endsAt);
+    activation = await activateEntitlement(
+      input.userId,
+      plan,
+      input.targetId,
+      endsAt,
+      input.adCreative
+    );
   } catch (err) {
     throw Object.assign(err instanceof Error ? err : new Error('Falha ao ativar'), { status: 400 });
   }
@@ -650,6 +681,83 @@ export async function revenueSummary() {
   ]);
 
   return { by_currency: paid, by_product: byProduct, recent_orders: recent };
+}
+
+export type AdCampaign = {
+  id: string;
+  title: string;
+  image_url: string;
+  link_url: string | null;
+  description: string | null;
+  is_active: number;
+  creative_configured: number;
+  start_date: string | null;
+  end_date: string | null;
+  order_ends_at: string | null;
+  impressions: number;
+  clicks: number;
+};
+
+export async function listUserAdCampaigns(userId: string) {
+  const rows = await db.all<AdCampaign>(
+    `SELECT a.id, a.title, a.image_url, a.link_url, a.description, a.is_active,
+            a.creative_configured, a.start_date, a.end_date,
+            (
+              SELECT MAX(o.ends_at) FROM billing_orders o
+              WHERE o.target_type = 'advertisement' AND o.target_id = a.id AND o.user_id = ?
+            ) AS order_ends_at,
+            COALESCE((
+              SELECT COUNT(*) FROM ad_events e
+              WHERE e.ad_id = a.id AND e.event_type = 'impression'
+            ), 0) AS impressions,
+            COALESCE((
+              SELECT COUNT(*) FROM ad_events e
+              WHERE e.ad_id = a.id AND e.event_type = 'click'
+            ), 0) AS clicks
+     FROM advertisements a
+     WHERE a.owner_id = ?
+     ORDER BY a.start_date DESC NULLS LAST, a.title ASC`,
+    [userId, userId]
+  );
+  return rows;
+}
+
+export async function updateAdCampaignCreative(
+  userId: string,
+  adId: string,
+  patch: AdCreativeInput
+) {
+  const title = patch.title?.trim();
+  const imageUrl = patch.image_url?.trim();
+  if (!title) throw Object.assign(new Error('Título é obrigatório'), { status: 400 });
+  if (!imageUrl) throw Object.assign(new Error('Imagem é obrigatória'), { status: 400 });
+
+  const ad = await db.get<{ id: string; owner_id: string | null }>(
+    'SELECT id, owner_id FROM advertisements WHERE id = ?',
+    [adId]
+  );
+  if (!ad || ad.owner_id !== userId) {
+    throw Object.assign(new Error('Campanha não encontrada'), { status: 404 });
+  }
+
+  await db.run(
+    `UPDATE advertisements SET
+       title = ?,
+       image_url = ?,
+       link_url = ?,
+       description = ?,
+       creative_configured = 1
+     WHERE id = ?`,
+    [
+      title,
+      imageUrl,
+      patch.link_url?.trim() || '',
+      patch.description?.trim() || '',
+      adId,
+    ]
+  );
+
+  return db.get('SELECT * FROM advertisements WHERE id = ?', [adId]);
 }
 
 export async function adMetricsSummary() {

@@ -454,7 +454,22 @@
     "promoCode": "Cupom de desconto (opcional)",
     "selectJob": "Selecione a vaga",
     "selectClassified": "Selecione o classificado",
-    "selectEvent": "Selecione o evento"
+    "selectEvent": "Selecione o evento",
+    "myAdCampaigns": "Minhas campanhas de anúncio",
+    "myAdCampaignsHint": "Configure o banner que aparece no feed. Campanhas sem imagem não são exibidas publicamente.",
+    "adCampaignOptional": "Banner da campanha (opcional agora)",
+    "adCampaignOptionalHint": "Você pode enviar a imagem agora ou configurar depois em “Minhas campanhas”.",
+    "adTitle": "Título do anúncio",
+    "adLink": "Link de destino (opcional)",
+    "adDescription": "Descrição curta (opcional)",
+    "adUploadImage": "Enviar imagem do banner",
+    "adCampaignNeedsSetup": "Campanha aguardando configuração",
+    "adCampaignSetupHint": "Envie a imagem e o título para ativar seu banner no feed.",
+    "adCampaignSave": "Salvar banner",
+    "adCampaignSaved": "Banner salvo. Sua campanha já pode aparecer no feed.",
+    "adCampaignPurchasedSetup": "Pagamento confirmado. Configure seu banner em “Minhas campanhas” abaixo.",
+    "adImpressions": "{{count}} impressões",
+    "adClicks": "{{count}} cliques"
   },
   "editProfile": {
     "title": "Editar Perfil",

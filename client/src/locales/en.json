@@ -454,7 +454,22 @@
     "promoCode": "Discount coupon (optional)",
     "selectJob": "Select the job post",
     "selectClassified": "Select the listing",
-    "selectEvent": "Select the event"
+    "selectEvent": "Select the event",
+    "myAdCampaigns": "My ad campaigns",
+    "myAdCampaignsHint": "Configure the banner shown in the feed. Campaigns without an image are not shown publicly.",
+    "adCampaignOptional": "Campaign banner (optional now)",
+    "adCampaignOptionalHint": "You can upload the image now or configure it later under “My ad campaigns”.",
+    "adTitle": "Ad title",
+    "adLink": "Destination link (optional)",
+    "adDescription": "Short description (optional)",
+    "adUploadImage": "Upload banner image",
+    "adCampaignNeedsSetup": "Campaign pending setup",
+    "adCampaignSetupHint": "Upload the image and title to activate your banner in the feed.",
+    "adCampaignSave": "Save banner",
+    "adCampaignSaved": "Banner saved. Your campaign can now appear in the feed.",
+    "adCampaignPurchasedSetup": "Payment confirmed. Configure your banner in “My ad campaigns” below.",
+    "adImpressions": "{{count}} impressions",
+    "adClicks": "{{count}} clicks"
   },
   "editProfile": {
     "title": "Edit Profile",

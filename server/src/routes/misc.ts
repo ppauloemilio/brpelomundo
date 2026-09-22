@@ -31,7 +31,9 @@ router.get('/advertisements', async (_req, res) => {
   const settings = await getMonetizationSettings();
   if (!settings.ads_enabled) return res.json([]);
   const ads = await db.all(
-    `SELECT * FROM advertisements WHERE is_active = 1
+    `SELECT id, title, image_url, link_url, description, order_num
+     FROM advertisements WHERE is_active = 1
+     AND (owner_id IS NULL OR creative_configured = 1)
      AND (start_date IS NULL OR start_date <= utc_day())
      AND (end_date IS NULL OR end_date >= utc_day())
      ORDER BY order_num ASC`

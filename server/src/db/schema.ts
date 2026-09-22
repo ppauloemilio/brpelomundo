@@ -209,6 +209,8 @@ export const SCHEMA = `
     image_url TEXT NOT NULL,
     link_url TEXT,
     description TEXT,
+    owner_id TEXT REFERENCES users(id),
+    creative_configured INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     order_num INTEGER DEFAULT 0,
     start_date TEXT,

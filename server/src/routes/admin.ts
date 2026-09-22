@@ -70,8 +70,10 @@ router.post('/advertisements', async (req, res) => {
   if (!title || !image_url) return res.status(400).json({ error: 'Título e imagem obrigatórios' });
   const id = uuid();
   await db.run(
-    `INSERT INTO advertisements (id, title, image_url, link_url, description, is_active, order_num, start_date, end_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO advertisements (
+       id, title, image_url, link_url, description, creative_configured,
+       is_active, order_num, start_date, end_date
+     ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     [
       id, title, image_url, link_url || null, description || null,
       is_active !== false ? 1 : 0, order_num ?? 0, start_date || null, end_date || null,
