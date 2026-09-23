@@ -5,11 +5,12 @@ import { api } from '@/lib/api';
 import { useMonetization } from '@/hooks/useMonetization';
 import { getCarouselStartIndex } from '@/lib/adRotation';
 import { cn } from '@/lib/utils';
+import type { AdPlacement } from '@/lib/adPlacements';
 import { AdBannerCard, trackAdImpression, type Ad } from '@/components/feed/AdBannerCard';
 
 const SLIDE_MS = 10_000;
 
-export function AdCarousel({ placement = 'feed' }: { placement?: string }) {
+export function AdCarousel({ placement = 'feed' }: { placement?: AdPlacement }) {
   const { t } = useTranslation();
   const { data: settings } = useMonetization();
   const [index, setIndex] = useState(0);
@@ -17,8 +18,8 @@ export function AdCarousel({ placement = 'feed' }: { placement?: string }) {
   const poolInitialized = useRef(false);
 
   const { data: ads = [] } = useQuery({
-    queryKey: ['advertisements', 'feed'],
-    queryFn: () => api<Ad[]>('/advertisements?placement=feed'),
+    queryKey: ['advertisements', placement],
+    queryFn: () => api<Ad[]>(`/advertisements?placement=${placement}`),
     enabled: settings?.ads_enabled,
   });
 
@@ -29,8 +30,8 @@ export function AdCarousel({ placement = 'feed' }: { placement?: string }) {
     }
     if (poolInitialized.current) return;
     poolInitialized.current = true;
-    setIndex(getCarouselStartIndex(ads.length));
-  }, [ads]);
+    setIndex(getCarouselStartIndex(ads.length, placement));
+  }, [ads, placement]);
 
   const ad = ads[index] ?? ads[0] ?? null;
   const multi = ads.length > 1;
@@ -55,11 +56,14 @@ export function AdCarousel({ placement = 'feed' }: { placement?: string }) {
 
   if (!settings?.ads_enabled || !ad) return null;
 
+  const carouselLabel =
+    placement === 'sidebar' ? t('feed.adCarouselSidebar') : t('feed.adCarousel');
+
   return (
     <div
       className="space-y-2"
       aria-roledescription="carousel"
-      aria-label={t('feed.adCarousel')}
+      aria-label={carouselLabel}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}

@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { COUNTRY_LABELS } from '@/lib/utils';
-import { AdBanner } from '@/components/feed/AdBanner';
+import { AdCarousel } from '@/components/feed/AdCarousel';
 
 export function FeedSidebar() {
   const { t } = useTranslation();
@@ -36,7 +36,7 @@ export function FeedSidebar() {
 
   return (
     <aside className="hidden min-w-0 flex-1 space-y-4 xl:block max-w-sm">
-      <AdBanner placement="sidebar" />
+      <AdCarousel placement="sidebar" />
       <Card className="border-slate-200/80 shadow-sm">
         <CardContent className="pt-4">
           <button type="button" className="flex w-full items-center justify-between text-left">
