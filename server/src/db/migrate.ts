@@ -54,8 +54,31 @@ const EXTRA_PLANS = [
   },
 ] as const;
 
+const AD_PLACEMENT_PLANS = [
+  {
+    code: 'ad_campaign_feed_30d',
+    product_type: 'ad_campaign',
+    name: 'Banner no feed (30 dias)',
+    description: 'Banner no carrossel do topo do feed, com impressões e cliques.',
+    price_cents: 14900,
+    currency: 'USD',
+    duration_days: 30,
+    sort_order: 51,
+  },
+  {
+    code: 'ad_campaign_sidebar_30d',
+    product_type: 'ad_campaign',
+    name: 'Banner na sidebar (30 dias)',
+    description: 'Banner na coluna lateral (telas grandes), com impressões e cliques.',
+    price_cents: 7900,
+    currency: 'USD',
+    duration_days: 30,
+    sort_order: 52,
+  },
+] as const;
+
 async function migrateBillingPlans() {
-  for (const plan of EXTRA_PLANS) {
+  for (const plan of [...EXTRA_PLANS, ...AD_PLACEMENT_PLANS]) {
     const exists = await db.get<{ id: string }>('SELECT id FROM billing_plans WHERE code = ?', [plan.code]);
     if (exists) continue;
     await db.run(
@@ -65,6 +88,23 @@ async function migrateBillingPlans() {
       [uuid(), plan.code, plan.product_type, plan.name, plan.description, plan.price_cents, plan.currency, plan.duration_days, plan.sort_order]
     );
   }
+}
+
+async function migrateAdCampaignComboPlan() {
+  await db.run(
+    `UPDATE billing_plans SET
+       name = ?,
+       description = ?,
+       price_cents = ?,
+       sort_order = ?
+     WHERE code = 'ad_campaign_30d'`,
+    [
+      'Combo feed + sidebar (30 dias)',
+      'Banners no feed (carrossel) e na sidebar. Economize comprando os dois espaços juntos.',
+      19900,
+      53,
+    ]
+  );
 }
 
 /** Colunas novas em bancos já existentes; idempotente para rodar a cada cold start. */
@@ -86,6 +126,8 @@ export async function migrateSchema() {
 
     ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS owner_id TEXT REFERENCES users(id);
     ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS creative_configured INTEGER DEFAULT 0;
+    ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS placement TEXT DEFAULT 'feed';
+    ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS campaign_group_id TEXT;
 
     CREATE TABLE IF NOT EXISTS profile_views (
       id TEXT PRIMARY KEY,
@@ -97,6 +139,7 @@ export async function migrateSchema() {
     CREATE INDEX IF NOT EXISTS idx_profile_views_profile ON profile_views(profile_user_id, viewed_at);
   `);
   await migrateBillingPlans();
+  await migrateAdCampaignComboPlan();
   await restoreSmokeTestBio();
   await backfillAdCampaignOwners();
 }

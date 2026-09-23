@@ -439,7 +439,7 @@
   },
   "billing": {
     "title": "Plans & billing",
-    "subtitle": "Subscribe to Premium, feature businesses, promote posts, or buy ad campaigns.",
+    "subtitle": "Subscribe to Premium, feature businesses, promote posts, or buy feed and sidebar banners.",
     "alreadyPremium": "You already have Premium. You can renew to extend the period.",
     "checkout": "Checkout",
     "demoHint": "Demo checkout: use card 4242… to simulate a real charge and activate the benefit immediately.",
@@ -473,7 +473,13 @@
     "adCampaignSaved": "Banner saved. Your campaign can now appear in the feed.",
     "adCampaignPurchasedSetup": "Payment confirmed. Configure your banner in “My ad campaigns” below.",
     "adImpressions": "{{count}} impressions",
-    "adClicks": "{{count}} clicks"
+    "adClicks": "{{count}} clicks",
+    "adPlacementFeed": "Feed banner",
+    "adPlacementSidebar": "Sidebar banner",
+    "adSizeFeed": "Ideal feed size: 1200×240 px (5:1 ratio). JPG, PNG or WebP, max 5 MB.",
+    "adSizeSidebar": "Ideal sidebar size: 768×256 px (3:1 ratio). JPG, PNG or WebP, max 5 MB.",
+    "adComboOptional": "Combo banners (optional now)",
+    "adComboDiscountHint": "Upload one image per slot or configure later under My ad campaigns."
   },
   "editProfile": {
     "title": "Edit Profile",

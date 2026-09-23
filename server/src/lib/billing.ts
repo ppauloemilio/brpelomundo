@@ -41,6 +41,11 @@ export type AdCreativeInput = {
   description?: string;
 };
 
+export type AdCreativesInput = {
+  feed?: AdCreativeInput;
+  sidebar?: AdCreativeInput;
+};
+
 export type CheckoutInput = {
   userId: string;
   planCode: string;
@@ -48,11 +53,73 @@ export type CheckoutInput = {
   paymentProvider?: 'demo' | 'admin_comp';
   cardLast4?: string;
   promoCode?: string;
+  /** @deprecated use adCreatives */
   adCreative?: AdCreativeInput;
+  adCreatives?: AdCreativesInput;
 };
+
+export type AdPlacementSlot = 'feed' | 'sidebar';
 
 const AD_PLACEHOLDER_IMAGE =
   'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=800&q=80';
+
+export function adPlacementsForPlanCode(planCode: string): AdPlacementSlot[] {
+  if (planCode === 'ad_campaign_sidebar_30d') return ['sidebar'];
+  if (planCode === 'ad_campaign_feed_30d') return ['feed'];
+  return ['feed', 'sidebar'];
+}
+
+function creativeForPlacement(
+  placement: AdPlacementSlot,
+  input: CheckoutInput
+): AdCreativeInput | undefined {
+  const fromMap = input.adCreatives?.[placement];
+  if (fromMap) return fromMap;
+  if (input.adCreative && adPlacementsForPlanCode(input.planCode).length === 1) {
+    return input.adCreative;
+  }
+  return undefined;
+}
+
+async function insertAdSlot(opts: {
+  userId: string;
+  placement: AdPlacementSlot;
+  durationDays: number;
+  creative?: AdCreativeInput;
+  campaignGroupId?: string | null;
+}) {
+  const adId = uuid();
+  const endDay = isoDay(addDays(opts.durationDays));
+  const configured = !!(opts.creative?.title?.trim() && opts.creative?.image_url?.trim());
+  const title = configured ? opts.creative!.title.trim() : 'Campanha patrocinada';
+  const imageUrl = configured ? opts.creative!.image_url.trim() : AD_PLACEHOLDER_IMAGE;
+  const linkUrl = configured ? (opts.creative!.link_url?.trim() || '') : '';
+  const description = configured
+    ? (opts.creative!.description?.trim() || '')
+    : 'Configure seu banner em Planos e cobrança.';
+
+  await db.run(
+    `INSERT INTO advertisements (
+       id, title, image_url, link_url, description, owner_id, creative_configured,
+       placement, campaign_group_id, is_active, order_num, start_date, end_date
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)`,
+    [
+      adId,
+      title,
+      imageUrl,
+      linkUrl,
+      description,
+      opts.userId,
+      configured ? 1 : 0,
+      opts.placement,
+      opts.campaignGroupId || null,
+      isoDay(new Date()),
+      endDay,
+    ]
+  );
+
+  return { adId, configured };
+}
 
 export type Promotion = {
   id: string;
@@ -112,8 +179,8 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
   {
     code: 'ad_campaign_30d',
     product_type: 'ad_campaign',
-    name: 'Campanha de anúncio (30 dias)',
-    description: 'Banner patrocinado no feed com relatório de impressões e cliques.',
+    name: 'Combo feed + sidebar (30 dias)',
+    description: 'Banners no feed (carrossel) e na sidebar. Economize comprando os dois espaços juntos.',
     price_cents: 19900,
     currency: 'USD',
     duration_days: 30,
@@ -183,6 +250,7 @@ async function activateEntitlement(
   plan: BillingPlan,
   targetId: string | undefined,
   endsAt: string,
+  adCreatives?: AdCreativesInput,
   adCreative?: AdCreativeInput
 ) {
   await ensureToggleForProduct(plan.product_type);
@@ -279,44 +347,34 @@ async function activateEntitlement(
   }
 
   if (plan.product_type === 'ad_campaign') {
-    const adId = targetId || uuid();
-    const endDay = isoDay(addDays(plan.duration_days));
-    const creative = adCreative;
-    const configured = !!(creative?.title?.trim() && creative?.image_url?.trim());
-    const title = configured ? creative!.title.trim() : 'Campanha patrocinada';
-    const imageUrl = configured ? creative!.image_url.trim() : AD_PLACEHOLDER_IMAGE;
-    const linkUrl = configured ? (creative!.link_url?.trim() || '') : '';
-    const description = configured
-      ? (creative!.description?.trim() || '')
-      : 'Configure seu banner em Planos e cobrança.';
+    const placements = adPlacementsForPlanCode(plan.code);
+    const isCombo = placements.length > 1;
+    const campaignGroupId = isCombo ? uuid() : null;
+    const checkoutInput = { adCreatives, adCreative, planCode: plan.code } as CheckoutInput;
 
-    const existing = await db.get('SELECT id FROM advertisements WHERE id = ?', [adId]);
-    if (!existing) {
-      await db.run(
-        `INSERT INTO advertisements (
-           id, title, image_url, link_url, description, owner_id, creative_configured,
-           is_active, order_num, start_date, end_date
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)`,
-        [
-          adId,
-          title,
-          imageUrl,
-          linkUrl,
-          description,
-          userId,
-          configured ? 1 : 0,
-          isoDay(new Date()),
-          endDay,
-        ]
-      );
-    } else {
-      await db.run(
-        `UPDATE advertisements SET is_active = 1, end_date = ?, owner_id = COALESCE(owner_id, ?)
-         WHERE id = ?`,
-        [endDay, userId, adId]
-      );
+    const created: Array<{ adId: string; placement: AdPlacementSlot; configured: boolean }> = [];
+    for (const placement of placements) {
+      const slot = await insertAdSlot({
+        userId,
+        placement,
+        durationDays: plan.duration_days,
+        creative: creativeForPlacement(placement, checkoutInput),
+        campaignGroupId,
+      });
+      created.push({ adId: slot.adId, placement, configured: slot.configured });
     }
-    return { target_type: 'advertisement', target_id: adId, ends_at: endsAt, needs_creative: !configured };
+
+    const allConfigured = created.every((c) => c.configured);
+    const primaryId = isCombo ? campaignGroupId! : created[0]!.adId;
+
+    return {
+      target_type: 'advertisement',
+      target_id: primaryId,
+      ends_at: endsAt,
+      needs_creative: !allConfigured,
+      ad_ids: created.map((c) => c.adId),
+      placements: created.map((c) => c.placement),
+    };
   }
 
   throw new Error('Tipo de plano não suportado');
@@ -398,6 +456,7 @@ export async function checkoutPlan(input: CheckoutInput) {
       plan,
       input.targetId,
       endsAt,
+      input.adCreatives,
       input.adCreative
     );
   } catch (err) {
@@ -437,6 +496,8 @@ export async function checkoutPlan(input: CheckoutInput) {
         plan_promo: publicPlan.has_promo,
         coupon: appliedPromo?.code || null,
         discount_from_list: plan.price_cents - (isComp ? 0 : amountCents),
+        ad_ids: (activation as { ad_ids?: string[] }).ad_ids || null,
+        placements: (activation as { placements?: string[] }).placements || null,
       }),
     ]
   );
@@ -689,6 +750,8 @@ export type AdCampaign = {
   image_url: string;
   link_url: string | null;
   description: string | null;
+  placement: string | null;
+  campaign_group_id: string | null;
   is_active: number;
   creative_configured: number;
   start_date: string | null;
@@ -700,11 +763,13 @@ export type AdCampaign = {
 
 export async function listUserAdCampaigns(userId: string) {
   const rows = await db.all<AdCampaign>(
-    `SELECT a.id, a.title, a.image_url, a.link_url, a.description, a.is_active,
-            a.creative_configured, a.start_date, a.end_date,
+    `SELECT a.id, a.title, a.image_url, a.link_url, a.description, a.placement,
+            a.campaign_group_id, a.is_active, a.creative_configured, a.start_date, a.end_date,
             (
               SELECT MAX(o.ends_at) FROM billing_orders o
-              WHERE o.target_type = 'advertisement' AND o.target_id = a.id AND o.user_id = ?
+              WHERE o.user_id = ?
+                AND o.target_type = 'advertisement'
+                AND (o.target_id = a.id OR o.target_id = a.campaign_group_id)
             ) AS order_ends_at,
             COALESCE((
               SELECT COUNT(*) FROM ad_events e

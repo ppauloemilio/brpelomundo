@@ -66,16 +66,17 @@ router.get('/advertisements', async (_req, res) => {
 });
 
 router.post('/advertisements', async (req, res) => {
-  const { title, image_url, link_url, description, is_active, order_num, start_date, end_date } = req.body;
+  const { title, image_url, link_url, description, is_active, order_num, start_date, end_date, placement } = req.body;
   if (!title || !image_url) return res.status(400).json({ error: 'Título e imagem obrigatórios' });
+  const slot = placement === 'sidebar' ? 'sidebar' : placement === 'feed' ? 'feed' : null;
   const id = uuid();
   await db.run(
     `INSERT INTO advertisements (
-       id, title, image_url, link_url, description, creative_configured,
+       id, title, image_url, link_url, description, creative_configured, placement,
        is_active, order_num, start_date, end_date
-     ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
     [
-      id, title, image_url, link_url || null, description || null,
+      id, title, image_url, link_url || null, description || null, slot,
       is_active !== false ? 1 : 0, order_num ?? 0, start_date || null, end_date || null,
     ]
   );

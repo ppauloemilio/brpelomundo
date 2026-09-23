@@ -13,6 +13,7 @@ import {
   AdCampaignPanel,
   emptyAdCampaignForm,
 } from '@/components/billing/AdCampaignPanel';
+import { adCampaignModeFromPlanCode, isAdCampaignPlan } from '@/lib/adPlacements';
 
 type Plan = {
   id: string;
@@ -46,6 +47,16 @@ function formatMoney(cents: number, currency: string) {
   }
 }
 
+function buildCreativePayload(form: ReturnType<typeof emptyAdCampaignForm>) {
+  if (!form.title.trim() || !form.image_url.trim()) return undefined;
+  return {
+    title: form.title.trim(),
+    image_url: form.image_url.trim(),
+    link_url: form.link_url.trim() || undefined,
+    description: form.description.trim() || undefined,
+  };
+}
+
 export function PricingPage() {
   const { t } = useTranslation();
   const { user, refreshUser } = useAuth();
@@ -57,7 +68,8 @@ export function PricingPage() {
   const [promoCode, setPromoCode] = useState('');
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [adCreative, setAdCreative] = useState(emptyAdCampaignForm());
+  const [adCreativeFeed, setAdCreativeFeed] = useState(emptyAdCampaignForm());
+  const [adCreativeSidebar, setAdCreativeSidebar] = useState(emptyAdCampaignForm());
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['billing-plans'],
@@ -92,15 +104,15 @@ export function PricingPage() {
 
   const plan = useMemo(() => plans.find((p) => p.code === selected), [plans, selected]);
   const payCents = plan?.effective_price_cents ?? plan?.price_cents ?? 0;
+  const adCampaignMode = plan ? adCampaignModeFromPlanCode(plan.code) : null;
 
   const needsBusiness = plan?.product_type === 'featured_business' || plan?.product_type === 'local_business';
   const needsPost = plan?.product_type === 'promoted_post';
   const needsJob = plan?.product_type === 'promoted_job';
   const needsClassified = plan?.product_type === 'classified_featured';
   const needsEvent = plan?.product_type === 'sponsored_event';
-  const needsAdCampaign = plan?.product_type === 'ad_campaign';
+  const needsAdCampaign = plan ? isAdCampaignPlan(plan.product_type, plan.code) : false;
   const jobPosts = myPosts.filter((p) => p.type === 'job');
-  const hasAdCreative = !!(adCreative.title.trim() && adCreative.image_url.trim());
 
   const checkout = useMutation({
     mutationFn: () =>
@@ -111,12 +123,10 @@ export function PricingPage() {
           target_id: targetId || undefined,
           card_last4: cardNumber.replace(/\D/g, '').slice(-4),
           promo_code: promoCode.trim() || undefined,
-          ad_creative: hasAdCreative
+          ad_creatives: needsAdCampaign
             ? {
-                title: adCreative.title.trim(),
-                image_url: adCreative.image_url.trim(),
-                link_url: adCreative.link_url.trim() || undefined,
-                description: adCreative.description.trim() || undefined,
+                feed: buildCreativePayload(adCreativeFeed),
+                sidebar: buildCreativePayload(adCreativeSidebar),
               }
             : undefined,
         }),
@@ -128,7 +138,8 @@ export function PricingPage() {
           ? t('billing.adCampaignPurchasedSetup')
           : res.message || t('billing.success');
       setDoneMsg(msg);
-      setAdCreative(emptyAdCampaignForm());
+      setAdCreativeFeed(emptyAdCampaignForm());
+      setAdCreativeSidebar(emptyAdCampaignForm());
       await refreshUser();
       qc.invalidateQueries({ queryKey: ['billing-orders'] });
       qc.invalidateQueries({ queryKey: ['billing-ad-campaigns'] });
@@ -183,7 +194,8 @@ export function PricingPage() {
               onClick={() => {
                 setSelected(p.code);
                 setTargetId('');
-                setAdCreative(emptyAdCampaignForm());
+                setAdCreativeFeed(emptyAdCampaignForm());
+                setAdCreativeSidebar(emptyAdCampaignForm());
                 setDoneMsg(null);
                 setError(null);
               }}
@@ -299,8 +311,37 @@ export function PricingPage() {
             </select>
           )}
 
-          {needsAdCampaign && (
-            <AdCampaignCheckoutFields form={adCreative} onChange={setAdCreative} />
+          {needsAdCampaign && adCampaignMode === 'feed' && (
+            <AdCampaignCheckoutFields
+              placement="feed"
+              form={adCreativeFeed}
+              onChange={setAdCreativeFeed}
+            />
+          )}
+
+          {needsAdCampaign && adCampaignMode === 'sidebar' && (
+            <AdCampaignCheckoutFields
+              placement="sidebar"
+              form={adCreativeSidebar}
+              onChange={setAdCreativeSidebar}
+            />
+          )}
+
+          {needsAdCampaign && adCampaignMode === 'combo' && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-slate-800">{t('billing.adComboOptional')}</p>
+              <p className="text-xs text-slate-500">{t('billing.adComboDiscountHint')}</p>
+              <AdCampaignCheckoutFields
+                placement="feed"
+                form={adCreativeFeed}
+                onChange={setAdCreativeFeed}
+              />
+              <AdCampaignCheckoutFields
+                placement="sidebar"
+                form={adCreativeSidebar}
+                onChange={setAdCreativeSidebar}
+              />
+            </div>
           )}
 
           <Input

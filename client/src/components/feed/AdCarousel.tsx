@@ -17,8 +17,8 @@ export function AdCarousel({ placement = 'feed' }: { placement?: string }) {
   const poolInitialized = useRef(false);
 
   const { data: ads = [] } = useQuery({
-    queryKey: ['advertisements'],
-    queryFn: () => api<Ad[]>('/advertisements'),
+    queryKey: ['advertisements', 'feed'],
+    queryFn: () => api<Ad[]>('/advertisements?placement=feed'),
     enabled: settings?.ads_enabled,
   });
 

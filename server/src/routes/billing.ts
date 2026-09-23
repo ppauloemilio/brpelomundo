@@ -49,19 +49,37 @@ router.patch('/ad-campaigns/:id', authMiddleware, async (req: AuthRequest, res) 
   }
 });
 
+function parseAdCreative(raw: unknown) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const c = raw as Record<string, unknown>;
+  return {
+    title: String(c.title || ''),
+    image_url: String(c.image_url || ''),
+    link_url: c.link_url ? String(c.link_url) : undefined,
+    description: c.description ? String(c.description) : undefined,
+  };
+}
+
 router.post('/checkout', authMiddleware, async (req: AuthRequest, res) => {
-  const { plan_code, target_id, card_last4, promo_code, ad_creative } = req.body;
+  const {
+    plan_code,
+    target_id,
+    card_last4,
+    promo_code,
+    ad_creative,
+    ad_creative_feed,
+    ad_creative_sidebar,
+    ad_creatives,
+  } = req.body;
   if (!plan_code?.trim()) return res.status(400).json({ error: 'plan_code é obrigatório' });
 
-  const adCreative =
-    ad_creative && typeof ad_creative === 'object'
-      ? {
-          title: String(ad_creative.title || ''),
-          image_url: String(ad_creative.image_url || ''),
-          link_url: ad_creative.link_url ? String(ad_creative.link_url) : undefined,
-          description: ad_creative.description ? String(ad_creative.description) : undefined,
-        }
-      : undefined;
+  const creativesRaw =
+    ad_creatives && typeof ad_creatives === 'object' ? (ad_creatives as Record<string, unknown>) : {};
+  const adCreatives = {
+    feed: parseAdCreative(ad_creative_feed ?? creativesRaw.feed),
+    sidebar: parseAdCreative(ad_creative_sidebar ?? creativesRaw.sidebar),
+  };
+  const hasCreatives = adCreatives.feed || adCreatives.sidebar;
 
   try {
     const result = await checkoutPlan({
@@ -71,7 +89,13 @@ router.post('/checkout', authMiddleware, async (req: AuthRequest, res) => {
       paymentProvider: 'demo',
       cardLast4: card_last4 || '4242',
       promoCode: promo_code || undefined,
-      adCreative,
+      adCreative: parseAdCreative(ad_creative),
+      adCreatives: hasCreatives
+        ? {
+            feed: adCreatives.feed,
+            sidebar: adCreatives.sidebar,
+          }
+        : undefined,
     });
     res.status(201).json({
       ok: true,

@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
+import {
+  AD_PLACEMENT_SPECS,
+  type AdPlacement,
+} from '@/lib/adPlacements';
 
 export type AdCampaign = {
   id: string;
@@ -14,6 +18,7 @@ export type AdCampaign = {
   image_url: string;
   link_url?: string | null;
   description?: string | null;
+  placement?: string | null;
   creative_configured: number;
   start_date?: string | null;
   end_date?: string | null;
@@ -22,15 +27,19 @@ export type AdCampaign = {
   clicks?: number;
 };
 
-type CampaignForm = {
+export type CampaignForm = {
   title: string;
   image_url: string;
   link_url: string;
   description: string;
 };
 
-function emptyForm(): CampaignForm {
+export function emptyAdCampaignForm(): CampaignForm {
   return { title: '', image_url: '', link_url: '', description: '' };
+}
+
+function placementOf(campaign: AdCampaign): AdPlacement {
+  return campaign.placement === 'sidebar' ? 'sidebar' : 'feed';
 }
 
 function CampaignEditor({
@@ -41,6 +50,8 @@ function CampaignEditor({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const placement = placementOf(campaign);
+  const spec = AD_PLACEMENT_SPECS[placement];
   const [form, setForm] = useState<CampaignForm>({
     title: campaign.title === 'Campanha patrocinada' ? '' : campaign.title,
     image_url: campaign.creative_configured ? campaign.image_url : '',
@@ -83,6 +94,8 @@ function CampaignEditor({
 
   const needsSetup = !campaign.creative_configured;
   const endsAt = campaign.order_ends_at || campaign.end_date;
+  const previewClass =
+    placement === 'feed' ? 'h-16 w-40 rounded-lg object-cover' : 'h-16 w-28 rounded-lg object-cover';
 
   return (
     <div
@@ -93,6 +106,9 @@ function CampaignEditor({
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+            {t(spec.i18nLabel)}
+          </p>
           <p className="font-medium text-slate-900">
             {needsSetup ? t('billing.adCampaignNeedsSetup') : campaign.title}
           </p>
@@ -109,6 +125,8 @@ function CampaignEditor({
           </div>
         )}
       </div>
+
+      <p className="mb-3 text-xs text-slate-500">{t(spec.i18nSize)}</p>
 
       {needsSetup && (
         <p className="mb-3 text-sm text-amber-800">{t('billing.adCampaignSetupHint')}</p>
@@ -128,10 +146,15 @@ function CampaignEditor({
             <img
               src={assetUrl(form.image_url) ?? form.image_url}
               alt=""
-              className="h-16 w-28 rounded-lg object-cover"
+              className={previewClass}
             />
           ) : (
-            <div className="flex h-16 w-28 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-400">
+            <div
+              className={cn(
+                'flex items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-400',
+                placement === 'feed' ? 'h-16 w-40' : 'h-16 w-28'
+              )}
+            >
               <ImagePlus className="h-6 w-6" />
             </div>
           )}
@@ -214,13 +237,16 @@ export function AdCampaignPanel() {
 }
 
 export function AdCampaignCheckoutFields({
+  placement,
   form,
   onChange,
 }: {
+  placement: AdPlacement;
   form: CampaignForm;
   onChange: (next: CampaignForm) => void;
 }) {
   const { t } = useTranslation();
+  const spec = AD_PLACEMENT_SPECS[placement];
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -237,9 +263,13 @@ export function AdCampaignCheckoutFields({
     }
   };
 
+  const previewClass =
+    placement === 'feed' ? 'h-14 w-32 rounded-lg object-cover' : 'h-14 w-24 rounded-lg object-cover';
+
   return (
     <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
-      <p className="text-sm font-medium text-slate-800">{t('billing.adCampaignOptional')}</p>
+      <p className="text-sm font-medium text-slate-800">{t(spec.i18nLabel)}</p>
+      <p className="text-xs text-slate-500">{t(spec.i18nSize)}</p>
       <p className="text-xs text-slate-500">{t('billing.adCampaignOptionalHint')}</p>
       <Input
         placeholder={t('billing.adTitle')}
@@ -248,11 +278,7 @@ export function AdCampaignCheckoutFields({
       />
       <div className="flex flex-wrap items-center gap-3">
         {form.image_url ? (
-          <img
-            src={assetUrl(form.image_url) ?? form.image_url}
-            alt=""
-            className="h-14 w-24 rounded-lg object-cover"
-          />
+          <img src={assetUrl(form.image_url) ?? form.image_url} alt="" className={previewClass} />
         ) : null}
         <label className="cursor-pointer text-sm font-medium text-brand-700">
           {uploading ? t('common.loading') : t('billing.adUploadImage')}
@@ -274,5 +300,3 @@ export function AdCampaignCheckoutFields({
     </div>
   );
 }
-
-export { emptyForm as emptyAdCampaignForm };

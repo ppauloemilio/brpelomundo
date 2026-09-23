@@ -439,7 +439,7 @@
   },
   "billing": {
     "title": "Planos e cobrança",
-    "subtitle": "Assine Premium, destaque negócios, promova posts ou compre campanhas de anúncio.",
+    "subtitle": "Assine Premium, destaque negócios, promova posts ou compre banners no feed e na sidebar.",
     "alreadyPremium": "Você já tem Premium ativo. Pode renovar para estender o período.",
     "checkout": "Pagamento",
     "demoHint": "Checkout em modo demo: use o cartão 4242… para simular cobrança real e ativar o benefício imediatamente.",
@@ -473,7 +473,13 @@
     "adCampaignSaved": "Banner salvo. Sua campanha já pode aparecer no feed.",
     "adCampaignPurchasedSetup": "Pagamento confirmado. Configure seu banner em “Minhas campanhas” abaixo.",
     "adImpressions": "{{count}} impressões",
-    "adClicks": "{{count}} cliques"
+    "adClicks": "{{count}} cliques",
+    "adPlacementFeed": "Banner no feed",
+    "adPlacementSidebar": "Banner na sidebar",
+    "adSizeFeed": "Tamanho ideal para o feed: 1200×240 px (proporção 5:1). JPG, PNG ou WebP, máx. 5 MB.",
+    "adSizeSidebar": "Tamanho ideal para a sidebar: 768×256 px (proporção 3:1). JPG, PNG ou WebP, máx. 5 MB.",
+    "adComboOptional": "Banners do combo (opcional agora)",
+    "adComboDiscountHint": "Envie uma imagem para cada espaço ou configure depois em Minhas campanhas."
   },
   "editProfile": {
     "title": "Editar Perfil",

@@ -27,16 +27,25 @@ router.get('/skills', async (_req, res) => {
   res.json(skills);
 });
 
-router.get('/advertisements', async (_req, res) => {
+router.get('/advertisements', async (req, res) => {
   const settings = await getMonetizationSettings();
   if (!settings.ads_enabled) return res.json([]);
+  const placement = (req.query.placement as string)?.trim();
+  const params: string[] = [];
+  let placementSql = '';
+  if (placement === 'feed' || placement === 'sidebar') {
+    placementSql = ' AND (placement IS NULL OR placement = ?)';
+    params.push(placement);
+  }
   const ads = await db.all(
-    `SELECT id, title, image_url, link_url, description, order_num
+    `SELECT id, title, image_url, link_url, description, order_num, placement
      FROM advertisements WHERE is_active = 1
      AND (owner_id IS NULL OR creative_configured = 1)
      AND (start_date IS NULL OR start_date <= utc_day())
      AND (end_date IS NULL OR end_date >= utc_day())
-     ORDER BY order_num ASC, id ASC`
+     ${placementSql}
+     ORDER BY order_num ASC, id ASC`,
+    params
   );
   res.json(ads);
 });

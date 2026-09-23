@@ -211,6 +211,8 @@ export const SCHEMA = `
     description TEXT,
     owner_id TEXT REFERENCES users(id),
     creative_configured INTEGER DEFAULT 0,
+    placement TEXT DEFAULT 'feed',
+    campaign_group_id TEXT,
     is_active INTEGER DEFAULT 1,
     order_num INTEGER DEFAULT 0,
     start_date TEXT,

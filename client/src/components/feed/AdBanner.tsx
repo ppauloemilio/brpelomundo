@@ -10,8 +10,8 @@ export function AdBanner({ placement = 'feed' }: { placement?: string }) {
   const tracked = useRef<string | null>(null);
 
   const { data: ads = [] } = useQuery({
-    queryKey: ['advertisements'],
-    queryFn: () => api<Ad[]>('/advertisements'),
+    queryKey: ['advertisements', 'sidebar'],
+    queryFn: () => api<Ad[]>('/advertisements?placement=sidebar'),
     enabled: settings?.ads_enabled,
   });
 
