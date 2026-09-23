@@ -9,7 +9,7 @@ import { PostCard, Post } from '@/components/feed/PostCard';
 import { SearchHero } from '@/components/feed/SearchHero';
 import { CreatePostCard } from '@/components/feed/CreatePostCard';
 import { FeedSidebar } from '@/components/feed/FeedSidebar';
-import { AdBanner } from '@/components/feed/AdBanner';
+import { AdCarousel } from '@/components/feed/AdCarousel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn, matchesFeedFilter, COUNTRY_LABELS, type FeedFilter } from '@/lib/utils';
 
@@ -128,7 +128,7 @@ export function FeedPage() {
           ) : (
             filtered.map((post, i) => (
               <div key={post.id} className="space-y-4">
-                {i === 0 && <AdBanner />}
+                {i === 0 && <AdCarousel />}
                 <PostCard post={post} />
               </div>
             ))
