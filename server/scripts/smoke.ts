@@ -69,7 +69,7 @@ async function main() {
   const bioBefore: string = me?.profile?.bio ?? '';
 
   const feed = await call({ path: '/api/posts?scope=city' });
-  const firstPostId: string = feed?.[0]?.id ?? '';
+  const firstPostId: string = feed?.posts?.[0]?.id ?? feed?.[0]?.id ?? '';
 
   const users = await call({ path: '/api/users' });
 

@@ -93,6 +93,11 @@ router.post('/friendships/accept/:userId', authMiddleware, async (req: AuthReque
   if (!friendship) return res.status(404).json({ error: 'Solicitação não encontrada' });
 
   await db.run('UPDATE friendships SET status = ? WHERE id = ?', ['accepted', friendship.id]);
+  await db.run(
+    `UPDATE notifications SET type = 'friendship_accepted_self', is_read = 1
+     WHERE user_id = ? AND actor_id = ? AND type = 'friendship_request'`,
+    [req.user!.id, userId]
+  );
   await createNotification(friendship.requester_id, req.user!.id, 'friendship_accepted', 'user', req.user!.id);
   res.json({ ok: true, status: 'accepted' });
 });
@@ -102,6 +107,11 @@ router.post('/friendships/reject/:userId', authMiddleware, async (req: AuthReque
   await db.run(
     `DELETE FROM friendships WHERE requester_id = ? AND receiver_id = ? AND status = 'pending'`,
     [userId, req.user!.id]
+  );
+  await db.run(
+    `UPDATE notifications SET type = 'friendship_rejected_self', is_read = 1
+     WHERE user_id = ? AND actor_id = ? AND type = 'friendship_request'`,
+    [req.user!.id, userId]
   );
   res.json({ ok: true });
 });

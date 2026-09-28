@@ -186,6 +186,31 @@ router.get('/feed/sidebar', authMiddleware, async (req: AuthRequest, res) => {
   const country = profile?.current_country || 'BR';
   const city = (profile?.current_city || '').trim();
 
+  const excludeSql = `
+    AND u.id NOT IN (SELECT following_id FROM follows WHERE follower_id = ?)
+    AND u.id NOT IN (
+      SELECT CASE WHEN f.requester_id = ? THEN f.receiver_id ELSE f.requester_id END
+      FROM friendships f
+      WHERE f.status = 'accepted' AND (f.requester_id = ? OR f.receiver_id = ?)
+    )
+    AND u.id NOT IN (
+      SELECT f.requester_id FROM friendships f
+      WHERE f.receiver_id = ? AND f.status = 'pending'
+    )
+    AND u.id NOT IN (
+      SELECT f.receiver_id FROM friendships f
+      WHERE f.requester_id = ? AND f.status = 'pending'
+    )`;
+
+  const excludeParams = [
+    req.user!.id,
+    req.user!.id,
+    req.user!.id,
+    req.user!.id,
+    req.user!.id,
+    req.user!.id,
+  ];
+
   const [trending, users] = await Promise.all([
     db.all(
       `SELECT id, content, likes_count FROM posts WHERE is_active = 1 AND country = ?
@@ -199,34 +224,44 @@ router.get('/feed/sidebar', authMiddleware, async (req: AuthRequest, res) => {
            FROM users u
            JOIN public_profiles p ON p.user_id = u.id
            WHERE p.current_country = ? AND u.id != ?
+           ${excludeSql}
            ORDER BY city_rank ASC, u.full_name ASC
            LIMIT 10`,
-          [city, country, req.user!.id]
+          [city, country, req.user!.id, ...excludeParams]
         )
       : db.all<Record<string, unknown>>(
           `SELECT u.id, u.username, u.full_name, u.avatar_url, p.current_country, p.current_city
            FROM users u
            JOIN public_profiles p ON p.user_id = u.id
            WHERE p.current_country = ? AND u.id != ?
+           ${excludeSql}
            ORDER BY u.full_name ASC
            LIMIT 10`,
-          [country, req.user!.id]
+          [country, req.user!.id, ...excludeParams]
         ),
   ]);
 
+  const mappedUsers = users.map((u) => ({
+    id: u.id,
+    username: u.username,
+    full_name: u.full_name,
+    avatar_url: u.avatar_url,
+    current_country: u.current_country,
+    address: u.current_city || '',
+    current_city: u.current_city || '',
+    in_same_city: city
+      ? String(u.current_city || '').trim().toLowerCase() === city.toLowerCase()
+      : false,
+  }));
+
+  const hasCityMatches = city ? mappedUsers.some((u) => u.in_same_city) : false;
+
   res.json({
     trending,
-    users: users.map((u) => ({
-      id: u.id,
-      username: u.username,
-      full_name: u.full_name,
-      avatar_url: u.avatar_url,
-      current_country: u.current_country,
-      address: u.current_city || '',
-      current_city: u.current_city || '',
-    })),
+    users: mappedUsers,
     country,
     city,
+    suggestion_scope: city && hasCityMatches ? 'city' : 'country',
   });
 });
 

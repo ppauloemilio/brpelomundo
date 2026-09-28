@@ -23,6 +23,7 @@ export function FeedSidebar() {
       users: Array<{ id: string; full_name: string; username: string; avatar_url: string | null; current_country: string; address?: string }>;
       country: string;
       city?: string;
+      suggestion_scope?: 'city' | 'country';
     }>('/feed/sidebar'),
   });
 
@@ -68,11 +69,14 @@ export function FeedSidebar() {
         <CardContent className="pt-4">
           <p className="font-semibold">{t('feed.peopleYouMayKnow')}</p>
           <p className="text-xs text-slate-500">
-            {data?.city
-              ? t('feed.braziliansIn', { place: data.city })
-              : t('feed.braziliansIn', { place: countryLabel })}
+            {data?.suggestion_scope === 'city' && data.city
+              ? t('feed.suggestionsInCity', { city: data.city })
+              : t('feed.suggestionsInCountry', { country: countryLabel })}
           </p>
           <ul className="mt-4 space-y-4">
+            {suggestedUsers.length === 0 && (
+              <li className="text-sm text-slate-500">{t('feed.noSuggestions')}</li>
+            )}
             {suggestedUsers.map((u) => (
               <li key={u.id} className="flex items-center gap-3">
                 <button type="button" onClick={() => navigate(`/user/${u.id}`)} className="shrink-0">

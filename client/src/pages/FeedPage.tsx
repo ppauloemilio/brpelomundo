@@ -49,11 +49,16 @@ export function FeedPage() {
     setSearchParams(next, { replace: true });
   }, [scope, filter, setSearchParams]);
 
-  const { data: posts = [], isLoading } = useQuery({
+  const { data: feedData, isLoading } = useQuery({
     queryKey: ['posts', scope],
-    queryFn: () => api<Post[]>(`/posts?scope=${scope}`),
+    queryFn: () =>
+      api<{ posts: Post[]; meta?: { city_fallback?: boolean; city?: string | null; country?: string } }>(
+        `/posts?scope=${scope}`
+      ),
   });
 
+  const posts = feedData?.posts ?? [];
+  const cityFallback = !!(feedData?.meta?.city_fallback && scope === 'city');
   const filtered = posts.filter((p) => matchesFeedFilter(p.type, filter));
   const city = user?.profile?.current_city;
   const countryLabel = COUNTRY_LABELS[user?.profile?.current_country || ''] || user?.profile?.current_country;
@@ -126,12 +131,22 @@ export function FeedPage() {
               </CardContent>
             </Card>
           ) : (
-            filtered.map((post, i) => (
-              <div key={post.id} className="space-y-4">
-                {i === 0 && <AdCarousel />}
-                <PostCard post={post} />
-              </div>
-            ))
+            <>
+              {cityFallback && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {t('feed.cityFallbackBanner', {
+                    city: city || t('home.yourArea'),
+                    country: countryLabel || feedData?.meta?.country || '',
+                  })}
+                </div>
+              )}
+              {filtered.map((post, i) => (
+                <div key={post.id} className="space-y-4">
+                  {i === 0 && <AdCarousel />}
+                  <PostCard post={post} />
+                </div>
+              ))}
+            </>
           )}
         </div>
 

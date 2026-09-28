@@ -44,13 +44,19 @@ export function NotificationsPage() {
     mutationFn: (userId: string) => api(`/social/friendships/accept/${userId}`, { method: 'POST' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-count'] });
       qc.invalidateQueries({ queryKey: ['friends'] });
+      qc.invalidateQueries({ queryKey: ['feed-sidebar'] });
     },
   });
 
   const rejectFriendMutation = useMutation({
     mutationFn: (userId: string) => api(`/social/friendships/reject/${userId}`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-count'] });
+      qc.invalidateQueries({ queryKey: ['feed-sidebar'] });
+    },
   });
 
   return (
@@ -77,8 +83,16 @@ export function NotificationsPage() {
               <Avatar name={n.actor_snapshot.full_name} src={n.actor_snapshot.avatar_url} className="h-10 w-10" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm">
-                  <span className="font-semibold">{n.actor_snapshot.full_name}</span>{' '}
-                  {t(`notifications.${n.type}` as 'notifications.like')}
+                  {n.type === 'friendship_accepted_self' ? (
+                    t('notifications.friendshipAcceptedSelfMsg', { name: n.actor_snapshot.full_name })
+                  ) : n.type === 'friendship_rejected_self' ? (
+                    t('notifications.friendshipRejectedSelfMsg', { name: n.actor_snapshot.full_name })
+                  ) : (
+                    <>
+                      <span className="font-semibold">{n.actor_snapshot.full_name}</span>{' '}
+                      {t(`notifications.${n.type}` as 'notifications.like')}
+                    </>
+                  )}
                 </p>
                 <p className="text-xs text-slate-400">{formatDate(n.created_at, i18n.language)}</p>
                 {n.type === 'friendship_request' && (
@@ -86,21 +100,17 @@ export function NotificationsPage() {
                     <Button
                       size="sm"
                       className="rounded-full"
-                      onClick={() => {
-                        acceptFriendMutation.mutate(n.actor_id);
-                        if (!n.is_read) markReadMutation.mutate(n.id);
-                      }}
+                      disabled={acceptFriendMutation.isPending || rejectFriendMutation.isPending}
+                      onClick={() => acceptFriendMutation.mutate(n.actor_id)}
                     >
-                      {t('community.acceptFriend')}
+                      {acceptFriendMutation.isPending ? t('common.loading') : t('community.acceptFriend')}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="rounded-full"
-                      onClick={() => {
-                        rejectFriendMutation.mutate(n.actor_id);
-                        if (!n.is_read) markReadMutation.mutate(n.id);
-                      }}
+                      disabled={acceptFriendMutation.isPending || rejectFriendMutation.isPending}
+                      onClick={() => rejectFriendMutation.mutate(n.actor_id)}
                     >
                       {t('community.rejectFriend')}
                     </Button>

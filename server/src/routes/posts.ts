@@ -76,17 +76,19 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
     LIMIT 50`;
 
   let posts: Array<{ id: string; author_id: string }>;
+  let effectiveScope = scope;
+  let cityFallback = false;
 
   if (scope === 'abroad') {
     posts = await db.all(
       `SELECT * FROM posts WHERE is_active = 1 AND UPPER(TRIM(country)) != 'BR' ${orderSql}`
     );
   } else if (scope === 'country' || !city) {
+    effectiveScope = 'country';
     posts = await db.all(`SELECT * FROM posts WHERE is_active = 1 AND country = ? ${orderSql}`, [
       country,
     ]);
   } else {
-    // city: posts of same city first logic via filter; if none, still return city-filtered set
     posts = await db.all(
       `SELECT * FROM posts
        WHERE is_active = 1 AND country = ?
@@ -95,8 +97,9 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
       [country, city]
     );
 
-    // Fallback: if no city posts yet, show country so feed is not empty for newcomers
     if (posts.length === 0) {
+      cityFallback = true;
+      effectiveScope = 'country';
       posts = await db.all(`SELECT * FROM posts WHERE is_active = 1 AND country = ? ${orderSql}`, [
         country,
       ]);
@@ -110,14 +113,23 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
 
   const premiumByAuthor = await authorPremiumMap(settings, posts.map((p) => p.author_id));
 
-  res.json(
-    posts.map((p) => formatPost(
-      settings,
-      p as Record<string, unknown>,
-      likedSet.has(p.id),
-      premiumByAuthor.get(p.author_id) ?? false
-    ))
-  );
+  res.json({
+    posts: posts.map((p) =>
+      formatPost(
+        settings,
+        p as Record<string, unknown>,
+        likedSet.has(p.id),
+        premiumByAuthor.get(p.author_id) ?? false
+      )
+    ),
+    meta: {
+      scope,
+      effective_scope: effectiveScope,
+      city_fallback: cityFallback,
+      city: city || null,
+      country,
+    },
+  });
 });
 
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
