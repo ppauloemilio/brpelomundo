@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import { Building2, ChevronRight, Search } from 'lucide-react';
 import L from 'leaflet';
 import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { MapBusinessFilters, categoryLabel, type MapFilters } from '@/components/map/MapBusinessFilters';
 import { BusinessDetailPanel } from '@/components/map/BusinessDetailPanel';
@@ -81,17 +82,32 @@ function buildQuery(search: string, filters: MapFilters, lat?: number | null, ln
   return params.toString();
 }
 
+function profileFilterCountry(country?: string) {
+  const c = country || '';
+  return c.toUpperCase() === 'BR' ? '' : c;
+}
+
 export function BusinessMapPage() {
   const { t } = useTranslation();
   const { data: monetization } = useMonetization();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const profileCountry = profileFilterCountry(user?.profile?.current_country);
+  const defaultCountryApplied = useRef(!!searchParams.get('country'));
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [filters, setFilters] = useState<MapFilters>({
     category: searchParams.get('category') || '',
-    country: searchParams.get('country') || '',
+    country: searchParams.get('country') || profileCountry,
     state: searchParams.get('state') || '',
     city: searchParams.get('city') || '',
   });
+
+  useEffect(() => {
+    if (defaultCountryApplied.current) return;
+    if (!profileCountry) return;
+    defaultCountryApplied.current = true;
+    setFilters((f) => (f.country ? f : { ...f, country: profileCountry }));
+  }, [profileCountry]);
   const [userLat, setUserLat] = useState<number | null>(
     searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : null
   );

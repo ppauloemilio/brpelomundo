@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Briefcase, Building2, MapPin, Search, User } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { ExploreGeoFilters, useCountryNameMap, type ExploreFilters } from '@/components/explore/ExploreGeoFilters';
 import { COUNTRY_LABELS, cn } from '@/lib/utils';
@@ -47,22 +48,37 @@ function buildExploreQuery(
   return params.toString();
 }
 
+function profileFilterCountry(country?: string) {
+  const c = country || '';
+  return c.toUpperCase() === 'BR' ? '' : c;
+}
+
 export function ExplorePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const countryNames = useCountryNameMap();
+  const profileCountry = profileFilterCountry(user?.profile?.current_country);
+  const defaultCountryApplied = useRef(!!searchParams.get('country'));
 
   const [tab, setTab] = useState<'people' | 'businesses'>(
     searchParams.get('type') === 'businesses' ? 'businesses' : 'people'
   );
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [filters, setFilters] = useState<ExploreFilters>({
-    country: searchParams.get('country') || '',
+    country: searchParams.get('country') || profileCountry,
     state: searchParams.get('state') || '',
     city: searchParams.get('city') || '',
     area: searchParams.get('area') || '',
   });
+
+  useEffect(() => {
+    if (defaultCountryApplied.current) return;
+    if (!profileCountry) return;
+    defaultCountryApplied.current = true;
+    setFilters((f) => (f.country ? f : { ...f, country: profileCountry }));
+  }, [profileCountry]);
 
   useEffect(() => {
     const next = buildExploreQuery(tab, search, filters);
@@ -113,7 +129,7 @@ export function ExplorePage() {
             type="button"
             onClick={() => {
               setTab('people');
-              setFilters((f) => ({ ...f, country: '', state: '', city: '' }));
+              setFilters((f) => ({ ...f, country: profileCountry, state: '', city: '' }));
             }}
             className={cn(
               'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
@@ -127,7 +143,7 @@ export function ExplorePage() {
             type="button"
             onClick={() => {
               setTab('businesses');
-              setFilters((f) => ({ ...f, country: '', state: '', city: '' }));
+              setFilters((f) => ({ ...f, country: profileCountry, state: '', city: '' }));
             }}
             className={cn(
               'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
