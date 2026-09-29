@@ -49,11 +49,25 @@ function formatPost(
     comments_count: row.comments_count,
     is_active: row.is_active,
     is_promoted: settings.paid_posts_enabled && promotedInDb,
+    comments_enabled: row.comments_enabled !== 0,
     author_is_premium: authorIsPremium,
     author_snapshot: { ...snapshot, is_premium: authorIsPremium },
     created_at: row.created_at,
     liked_by_me: likedByMe,
   };
+}
+
+async function softDeleteCommentTree(commentId: string): Promise<number> {
+  const children = await db.all<{ id: string }>(
+    'SELECT id FROM comments WHERE parent_id = ? AND is_active = 1',
+    [commentId]
+  );
+  let removed = 1;
+  for (const child of children) {
+    removed += await softDeleteCommentTree(child.id);
+  }
+  await db.run('UPDATE comments SET is_active = 0 WHERE id = ?', [commentId]);
+  return removed;
 }
 
 router.get('/', authMiddleware, async (req: AuthRequest, res) => {
@@ -180,6 +194,31 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   res.json({ ok: true });
 });
 
+router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
+  const { comments_enabled } = req.body as { comments_enabled?: boolean };
+  const post = await db.get<{ author_id: string }>(
+    'SELECT * FROM posts WHERE id = ? AND is_active = 1',
+    [id]
+  );
+  if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+  if (post.author_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
+  if (comments_enabled === undefined) {
+    return res.status(400).json({ error: 'Nada para atualizar' });
+  }
+  await db.run('UPDATE posts SET comments_enabled = ? WHERE id = ?', [
+    comments_enabled ? 1 : 0,
+    id,
+  ]);
+  const [updated, settings] = await Promise.all([
+    db.get('SELECT * FROM posts WHERE id = ?', [id]),
+    getMonetizationSettings(),
+  ]);
+  const premium =
+    (await authorPremiumMap(settings, [post.author_id])).get(post.author_id) ?? false;
+  res.json(formatPost(settings, updated as Record<string, unknown>, false, premium));
+});
+
 router.post('/:id/like', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
   const post = await db.get<{ id: string; author_id: string; likes_count: number }>(
@@ -228,6 +267,24 @@ router.delete('/:id/like', authMiddleware, async (req: AuthRequest, res) => {
   res.json({ ok: true, likes_count: updated!.likes_count });
 });
 
+router.get('/:id/likes', authMiddleware, async (req, res) => {
+  const id = paramId(req.params.id);
+  const post = await db.get('SELECT id FROM posts WHERE id = ? AND is_active = 1', [id]);
+  if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+  const rows = await db.all<{ user_id: string; user_snapshot: string; created_at: string }>(
+    'SELECT user_id, user_snapshot, created_at FROM likes WHERE post_id = ? ORDER BY created_at DESC',
+    [id]
+  );
+  res.json(
+    rows.map((r) => ({
+      user_id: r.user_id,
+      user_snapshot: parseJson(r.user_snapshot, {}),
+      created_at: r.created_at,
+    }))
+  );
+});
+
 router.get('/:id/comments', authMiddleware, async (req, res) => {
   const id = paramId(req.params.id);
   const comments = await db.all<{ author_snapshot: string }>(
@@ -244,23 +301,46 @@ router.get('/:id/comments', authMiddleware, async (req, res) => {
 
 router.post('/:id/comments', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const { content } = req.body;
+  const { content, parent_id: parentId } = req.body as { content?: string; parent_id?: string };
   if (!content?.trim()) return res.status(400).json({ error: 'Comentário vazio' });
 
-  const post = await db.get<{ id: string; author_id: string }>(
+  const post = await db.get<{ id: string; author_id: string; comments_enabled: number }>(
     'SELECT * FROM posts WHERE id = ? AND is_active = 1',
     [id]
   );
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+  if (post.comments_enabled === 0) {
+    return res.status(403).json({ error: 'Comentários desabilitados neste post' });
+  }
+
+  if (parentId) {
+    const parent = await db.get<{ post_id: string }>(
+      'SELECT post_id FROM comments WHERE id = ? AND is_active = 1',
+      [parentId]
+    );
+    if (!parent || parent.post_id !== post.id) {
+      return res.status(400).json({ error: 'Comentário pai inválido' });
+    }
+  }
 
   const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [req.user!.id]);
   const commentId = uuid();
   await db.run(
-    'INSERT INTO comments (id, post_id, author_id, content, author_snapshot) VALUES (?, ?, ?, ?, ?)',
-    [commentId, post.id, user!.id, content.trim(), userSnapshot(user!)]
+    'INSERT INTO comments (id, post_id, author_id, parent_id, content, author_snapshot) VALUES (?, ?, ?, ?, ?, ?)',
+    [commentId, post.id, user!.id, parentId || null, content.trim(), userSnapshot(user!)]
   );
   await db.run('UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?', [post.id]);
-  await createNotification(post.author_id, user!.id, 'comment', 'post', post.id);
+
+  const notifyUserId = parentId
+    ? (
+        await db.get<{ author_id: string }>('SELECT author_id FROM comments WHERE id = ?', [
+          parentId,
+        ])
+      )?.author_id
+    : post.author_id;
+  if (notifyUserId && notifyUserId !== user!.id) {
+    await createNotification(notifyUserId, user!.id, 'comment', 'post', post.id);
+  }
 
   const comment = await db.get<{ author_snapshot: string }>(
     'SELECT * FROM comments WHERE id = ?',
@@ -270,6 +350,37 @@ router.post('/:id/comments', authMiddleware, async (req: AuthRequest, res) => {
     ...comment,
     author_snapshot: parseJson(comment!.author_snapshot, {}),
   });
+});
+
+router.delete('/:postId/comments/:commentId', authMiddleware, async (req: AuthRequest, res) => {
+  const postId = paramId(req.params.postId);
+  const commentId = paramId(req.params.commentId);
+
+  const post = await db.get<{ author_id: string; comments_count: number }>(
+    'SELECT author_id, comments_count FROM posts WHERE id = ? AND is_active = 1',
+    [postId]
+  );
+  if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+
+  const comment = await db.get<{ id: string; author_id: string; post_id: string }>(
+    'SELECT * FROM comments WHERE id = ? AND is_active = 1',
+    [commentId]
+  );
+  if (!comment || comment.post_id !== postId) {
+    return res.status(404).json({ error: 'Comentário não encontrado' });
+  }
+
+  const isPostOwner = post.author_id === req.user!.id;
+  const isCommentAuthor = comment.author_id === req.user!.id;
+  if (!isPostOwner && !isCommentAuthor) {
+    return res.status(403).json({ error: 'Sem permissão' });
+  }
+
+  const removed = await softDeleteCommentTree(commentId);
+  const nextCount = Math.max(0, post.comments_count - removed);
+  await db.run('UPDATE posts SET comments_count = ? WHERE id = ?', [nextCount, postId]);
+
+  res.json({ ok: true, comments_count: nextCount, removed });
 });
 
 router.post('/:id/share', authMiddleware, async (req: AuthRequest, res) => {

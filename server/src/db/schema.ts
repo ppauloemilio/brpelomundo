@@ -142,6 +142,7 @@ export const SCHEMA = `
     is_active INTEGER DEFAULT 1,
     is_promoted INTEGER DEFAULT 0,
     promoted_until TEXT,
+    comments_enabled INTEGER DEFAULT 1,
     author_snapshot TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT utc_now()
   );
@@ -150,6 +151,7 @@ export const SCHEMA = `
     id TEXT PRIMARY KEY,
     post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     author_id TEXT NOT NULL REFERENCES users(id),
+    parent_id TEXT REFERENCES comments(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     author_snapshot TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,

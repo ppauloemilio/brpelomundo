@@ -129,6 +129,9 @@ export async function migrateSchema() {
     ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS placement TEXT DEFAULT 'feed';
     ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS campaign_group_id TEXT;
 
+    ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments_enabled INTEGER DEFAULT 1;
+    ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES comments(id) ON DELETE CASCADE;
+
     CREATE TABLE IF NOT EXISTS profile_views (
       id TEXT PRIMARY KEY,
       profile_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
