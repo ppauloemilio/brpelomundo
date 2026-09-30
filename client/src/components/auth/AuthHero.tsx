@@ -22,39 +22,43 @@ export function AuthHero() {
   });
 
   return (
-    <div className="flex min-h-[min(100vh,920px)] flex-col bg-brand-900 px-8 py-10 text-white lg:min-h-screen lg:px-12 lg:py-12">
-      <div className="flex items-center gap-4">
-        <AppLogo className="h-14 w-14 shrink-0 lg:h-16 lg:w-16" />
-        <div>
-          <p className="text-xl font-bold leading-tight lg:text-[1.35rem]">{t('app.name')}</p>
-          <p className="mt-0.5 text-sm text-white/75">{t('app.tagline')}</p>
+    <div className="flex min-h-screen flex-col justify-between bg-brand-900 px-8 py-10 text-white sm:px-10 lg:px-14 lg:py-12">
+      <div>
+        <div className="flex items-center gap-4 sm:gap-5">
+          <AppLogo className="h-[72px] w-[72px] shrink-0 sm:h-[88px] sm:w-[88px]" />
+          <div className="min-w-0 pt-0.5">
+            <p className="text-lg font-bold leading-tight sm:text-[1.35rem]">{t('app.name')}</p>
+            <p className="mt-1 text-sm leading-snug text-white/70">{t('app.tagline')}</p>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-10 flex flex-1 flex-col justify-center lg:mt-12">
-        <h1 className="max-w-lg text-[1.75rem] font-bold leading-tight tracking-tight lg:text-4xl">
+        <h1 className="mt-10 max-w-[22rem] text-[1.85rem] font-bold leading-[1.12] tracking-tight sm:mt-12 sm:max-w-[24rem] sm:text-[2.15rem] lg:text-[2.25rem]">
           {t('auth.loginHeadline')}
         </h1>
-        <p className="mt-4 max-w-md text-base leading-relaxed text-white/80 lg:text-[1.05rem]">
+        <p className="mt-5 max-w-[21rem] text-[0.9375rem] leading-relaxed text-white/75 sm:max-w-[23rem] sm:text-base">
           {t('auth.loginSubheadline')}
         </p>
 
-        <ul className="mt-10 space-y-5 lg:mt-12">
+        <ul className="mt-9 space-y-5 sm:mt-10 sm:space-y-6">
           {VALUE_KEYS.map(({ icon: Icon, titleKey, descKey }) => (
-            <li key={titleKey} className="flex gap-3">
-              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10">
+            <li key={titleKey} className="flex gap-3 sm:gap-3.5">
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10">
                 <Icon className="h-[18px] w-[18px] text-white" strokeWidth={2} />
               </span>
-              <div>
-                <p className="font-semibold text-white">{t(titleKey)}</p>
-                <p className="mt-0.5 text-sm leading-relaxed text-white/70">{t(descKey)}</p>
+              <div className="min-w-0 pt-0.5">
+                <p className="text-[0.9375rem] font-semibold leading-snug text-white sm:text-base">
+                  {t(titleKey)}
+                </p>
+                <p className="mt-1 max-w-[19rem] text-sm leading-relaxed text-white/65">
+                  {t(descKey)}
+                </p>
               </div>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="mt-10 flex flex-wrap items-center gap-2 lg:mt-12">
+      <div className="mt-10 flex flex-wrap items-center gap-2 sm:mt-12">
         {countries.map((code) => (
           <span
             key={code}
@@ -65,7 +69,7 @@ export function AuthHero() {
             {code}
           </span>
         ))}
-        <span className="ml-1 text-sm text-white/80">{t('auth.countriesHint')}</span>
+        <span className="ml-1 text-sm text-white/75">{t('auth.countriesHint')}</span>
       </div>
     </div>
   );
