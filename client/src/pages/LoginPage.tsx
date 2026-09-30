@@ -37,12 +37,6 @@ export function LoginPage() {
     }
   };
 
-  const fillDemo = () => {
-    setEmail('ana@demo.com');
-    setPassword('demo123');
-    setError('');
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-2">
       <AuthHero />
@@ -134,13 +128,6 @@ export function LoginPage() {
               {t('auth.joinFree')}
             </Button>
           </div>
-
-          <p className="mt-6 text-center text-xs text-slate-400">
-            {t('auth.demoHint')}{' '}
-            <button type="button" onClick={fillDemo} className="font-medium text-brand-700 hover:underline">
-              {t('auth.demoFill')}
-            </button>
-          </p>
         </div>
       </div>
     </div>

@@ -36,6 +36,14 @@ export function timeAgo(date: string, locale = 'pt-BR'): string {
   return 'agora';
 }
 
+export function countryCodeToFlag(code: string): string {
+  const normalized = code.toUpperCase() === 'UK' ? 'GB' : code.toUpperCase();
+  if (normalized.length !== 2 || !/^[A-Z]{2}$/.test(normalized)) return '🌍';
+  return String.fromCodePoint(
+    ...[...normalized].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65)
+  );
+}
+
 export const COUNTRY_LABELS: Record<string, string> = {
   BR: 'Brasil',
   US: 'Estados Unidos',

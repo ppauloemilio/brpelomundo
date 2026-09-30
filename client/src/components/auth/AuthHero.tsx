@@ -1,7 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Globe, MapPin, Users, Sparkles } from 'lucide-react';
-
-const FLAGS = ['🇧🇷', '🇺🇸', '🇵🇹', '🇩🇪', '🇨🇦', '🇬🇧'];
+import { useQuery } from '@tanstack/react-query';
+import { MapPin, Users, Sparkles } from 'lucide-react';
+import { api } from '@/lib/api';
+import { AppLogo } from '@/components/ui/AppLogo';
+import { countryCodeToFlag } from '@/lib/utils';
 
 const VALUE_KEYS = [
   { icon: Users, titleKey: 'auth.valueConnect', descKey: 'auth.valueConnectDesc' },
@@ -9,8 +11,16 @@ const VALUE_KEYS = [
   { icon: Sparkles, titleKey: 'auth.valueShare', descKey: 'auth.valueShareDesc' },
 ] as const;
 
+const FALLBACK_COUNTRIES = ['BR', 'US', 'PT', 'DE', 'CA', 'UK'];
+
 export function AuthHero() {
   const { t } = useTranslation();
+
+  const { data: countries = FALLBACK_COUNTRIES } = useQuery({
+    queryKey: ['registered-countries'],
+    queryFn: () => api<string[]>('/stats/registered-countries'),
+    staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <div className="relative flex h-full min-h-[280px] flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-700 p-8 text-white lg:min-h-0 lg:p-12">
@@ -19,8 +29,8 @@ export function AuthHero() {
 
       <div className="relative">
         <div className="mb-8 flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-            <Globe className="h-6 w-6 text-white" />
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 p-1.5 backdrop-blur-sm">
+            <AppLogo size="lg" className="h-full w-full" />
           </span>
           <div>
             <p className="text-lg font-bold leading-tight">{t('app.name')}</p>
@@ -51,13 +61,14 @@ export function AuthHero() {
       </ul>
 
       <div className="relative mt-8 flex flex-wrap items-center gap-2">
-        {FLAGS.map((flag) => (
+        {countries.map((code) => (
           <span
-            key={flag}
+            key={code}
+            title={code}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg backdrop-blur-sm"
-            aria-hidden
+            aria-label={code}
           >
-            {flag}
+            {countryCodeToFlag(code)}
           </span>
         ))}
         <span className="ml-1 text-sm text-brand-100/90">{t('auth.countriesHint')}</span>

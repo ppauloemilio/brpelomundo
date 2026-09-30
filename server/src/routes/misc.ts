@@ -22,6 +22,20 @@ router.get('/countries', async (_req, res) => {
   res.json(countries);
 });
 
+/** Países com usuários cadastrados — público (login/landing). */
+router.get('/stats/registered-countries', async (_req, res) => {
+  const rows = await db.all<{ code: string }>(
+    `SELECT DISTINCT UPPER(TRIM(p.current_country)) AS code
+     FROM public_profiles p
+     JOIN users u ON u.id = p.user_id
+     WHERE u.is_active = 1
+       AND p.current_country IS NOT NULL
+       AND TRIM(p.current_country) != ''
+     ORDER BY code`
+  );
+  res.json(rows.map((r) => r.code));
+});
+
 router.get('/skills', async (_req, res) => {
   const skills = await db.all('SELECT * FROM skills ORDER BY name');
   res.json(skills);

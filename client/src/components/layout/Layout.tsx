@@ -2,8 +2,9 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Bell, Home, Map, Search, Users, MessageCircle, Plus, Menu, Globe, Calendar, LogOut, Tag,
+  Bell, Home, Map, Search, Users, MessageCircle, Plus, Menu, Calendar, LogOut, Tag,
 } from 'lucide-react';
+import { AppLogo } from '@/components/ui/AppLogo';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
@@ -61,7 +62,7 @@ export function Layout() {
             className="flex items-center gap-2 font-bold text-brand-800"
             onClick={() => navigate('/home')}
           >
-            <Globe className="h-6 w-6 text-brand-600" />
+            <AppLogo size="sm" />
             <span className="hidden sm:inline text-base">{t('app.name')}</span>
           </button>
 
@@ -162,7 +163,7 @@ export function Layout() {
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setMenuOpen(false)}>
           <div className="absolute left-0 top-0 h-full w-72 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-6 flex items-center gap-2 font-bold text-brand-800">
-              <Globe className="h-6 w-6" /> {t('app.name')}
+              <AppLogo size="sm" /> {t('app.name')}
             </div>
             <nav className="flex flex-col gap-1">
               {mainNav.map(({ to, icon: Icon, labelKey }) => (
