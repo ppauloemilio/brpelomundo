@@ -25,7 +25,7 @@ export function AuthHero() {
     <div className="flex min-h-screen flex-col justify-between bg-brand-900 px-8 py-10 text-white sm:px-10 lg:px-14 lg:py-12">
       <div>
         <div className="flex items-center gap-4 sm:gap-5">
-          <AppLogo className="h-[72px] w-[72px] shrink-0 sm:h-[88px] sm:w-[88px]" />
+          <AppLogo className="h-[80px] w-[80px] shrink-0 sm:h-[96px] sm:w-[96px]" />
           <div className="min-w-0 pt-0.5">
             <p className="text-lg font-bold leading-tight sm:text-[1.35rem]">{t('app.name')}</p>
             <p className="mt-1 text-sm leading-snug text-white/70">{t('app.tagline')}</p>

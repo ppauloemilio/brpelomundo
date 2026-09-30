@@ -16,7 +16,7 @@ export function AppLogo({ className, size = 'md' }: Props) {
   return (
     <img
       src="/logo.png"
-      alt=""
+      alt="Br Pelo Mundo"
       className={cn('object-contain', sizes[size], className)}
     />
   );
