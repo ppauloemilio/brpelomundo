@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 type Props = {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  src?: string;
 };
 
 const sizes = {
@@ -12,10 +13,10 @@ const sizes = {
   xl: 'h-16 w-16',
 };
 
-export function AppLogo({ className, size = 'md' }: Props) {
+export function AppLogo({ className, size = 'md', src = '/logo.png' }: Props) {
   return (
     <img
-      src="/logo.png"
+      src={src}
       alt="Br Pelo Mundo"
       className={cn('object-contain', sizes[size], className)}
     />

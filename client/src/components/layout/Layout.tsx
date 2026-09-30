@@ -62,7 +62,7 @@ export function Layout() {
             className="flex items-center gap-2 font-bold text-brand-800"
             onClick={() => navigate('/home')}
           >
-            <AppLogo size="sm" />
+            <AppLogo size="sm" src="/logo-bg.png" />
             <span className="hidden sm:inline text-base">{t('app.name')}</span>
           </button>
 
@@ -163,7 +163,7 @@ export function Layout() {
         <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setMenuOpen(false)}>
           <div className="absolute left-0 top-0 h-full w-72 bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-6 flex items-center gap-2 font-bold text-brand-800">
-              <AppLogo size="sm" /> {t('app.name')}
+              <AppLogo size="sm" src="/logo-bg.png" /> {t('app.name')}
             </div>
             <nav className="flex flex-col gap-1">
               {mainNav.map(({ to, icon: Icon, labelKey }) => (
