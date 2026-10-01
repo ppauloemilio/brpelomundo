@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight } from 'lucide-react';
 import i18n from '@/i18n';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthHero } from '@/components/auth/AuthHero';
+import { LegalFooter, TermsConsent } from '@/components/legal/LegalFooter';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
@@ -14,6 +16,9 @@ export function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '', username: '', full_name: '', country: 'US' });
+  const [accepted, setAccepted] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resent, setResent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,9 +31,14 @@ export function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    if (!accepted) {
+      setError(t('auth.acceptTermsRequired'));
+      setLoading(false);
+      return;
+    }
     try {
-      await register(form);
-      navigate('/onboarding');
+      const res = await register({ ...form, terms_accepted: true });
+      setPendingEmail(res.email);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'));
     } finally {
@@ -71,6 +81,27 @@ export function RegisterPage() {
             </div>
           </div>
 
+          {pendingEmail ? (
+            <div className="space-y-4 rounded-2xl border border-brand-100 bg-white p-5">
+              <h3 className="text-lg font-semibold text-slate-900">{t('auth.checkEmailTitle')}</h3>
+              <p className="text-sm leading-relaxed text-slate-600">{t('auth.checkEmailBody', { email: pendingEmail })}</p>
+              {resent && <p className="text-sm text-brand-800">{t('auth.resendSent')}</p>}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={async () => {
+                  await api('/auth/resend-verification', {
+                    method: 'POST',
+                    body: JSON.stringify({ email: pendingEmail }),
+                  });
+                  setResent(true);
+                }}
+              >
+                {t('auth.resendEmail')}
+              </Button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
             {(['full_name', 'username', 'email', 'password'] as const).map((field) => (
               <div key={field} className="space-y-1.5">
@@ -102,17 +133,20 @@ export function RegisterPage() {
               </select>
             </div>
 
+            <TermsConsent checked={accepted} onChange={setAccepted} />
+
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
                 {error}
               </p>
             )}
 
-            <Button type="submit" size="lg" className="mt-2 h-12 w-full text-base" disabled={loading}>
+            <Button type="submit" size="lg" className="mt-2 h-12 w-full text-base" disabled={loading || !accepted}>
               {loading ? t('common.loading') : t('auth.joinFree')}
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
           </form>
+          )}
 
           <p className="mt-6 text-center text-sm text-slate-500">
             {t('auth.hasAccount')}{' '}
@@ -120,6 +154,7 @@ export function RegisterPage() {
               {t('auth.login')}
             </button>
           </p>
+          <LegalFooter className="mt-8" />
         </div>
       </div>
     </div>

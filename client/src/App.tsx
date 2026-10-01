@@ -28,6 +28,8 @@ import { GroupDetailPage } from '@/pages/GroupDetailPage';
 import { EventsPage } from '@/pages/EventsPage';
 import { ClassifiedsPage } from '@/pages/ClassifiedsPage';
 import { PricingPage } from '@/pages/PricingPage';
+import { LegalPage } from '@/pages/LegalPage';
+import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 10000 } },
@@ -85,6 +87,11 @@ export default function App() {
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
             <Route path="/setup-password" element={<SetupPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/sobre" element={<LegalPage />} />
+            <Route path="/privacidade" element={<LegalPage />} />
+            <Route path="/termos" element={<LegalPage />} />
+            <Route path="/seguranca" element={<LegalPage />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/home" replace />} />
               <Route path="home" element={<HomePage />} />

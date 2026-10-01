@@ -132,6 +132,19 @@ export async function migrateSchema() {
     ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments_enabled INTEGER DEFAULT 1;
     ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id TEXT REFERENCES comments(id) ON DELETE CASCADE;
 
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT;
+
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT UNIQUE NOT NULL,
+      email TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT utc_now()
+    );
+
     CREATE TABLE IF NOT EXISTS profile_views (
       id TEXT PRIMARY KEY,
       profile_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -145,6 +158,28 @@ export async function migrateSchema() {
   await migrateAdCampaignComboPlan();
   await restoreSmokeTestBio();
   await backfillAdCampaignOwners();
+  await grandfatherEmailVerification();
+}
+
+/** Contas criadas antes da confirmação de e-mail continuam podendo entrar. Roda uma vez. */
+async function grandfatherEmailVerification() {
+  const flag = await db.get<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = 'email_verify_grandfathered'`
+  );
+  if (flag) return;
+
+  await db.run(`
+    UPDATE users
+    SET email_verified = 1
+    WHERE COALESCE(email_verified, 0) = 0
+      AND NOT EXISTS (
+        SELECT 1 FROM email_verifications v WHERE v.user_id = users.id
+      )
+  `);
+  await db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('email_verify_grandfathered', '1')
+     ON CONFLICT (key) DO NOTHING`
+  );
 }
 
 async function backfillAdCampaignOwners() {

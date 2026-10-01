@@ -36,6 +36,15 @@ type Listing = {
 
 type ClassifiedQuota = { used: number; max: number; can_create: boolean; premium: boolean };
 
+function SafetyNotice() {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950">
+      {t('classifieds.safetyNotice')}
+    </div>
+  );
+}
+
 const CATEGORIES = [
   'furniture', 'electronics', 'cars', 'clothes', 'real_estate',
   'brazilian_products', 'services', 'baby', 'home', 'other',
@@ -52,6 +61,7 @@ export function ClassifiedsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [category, setCategory] = useState('');
   const [selected, setSelected] = useState<Listing | null>(null);
+  const [declareAccurate, setDeclareAccurate] = useState(false);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -88,6 +98,7 @@ export function ClassifiedsPage() {
         body: JSON.stringify({
           ...form,
           price: form.price === '' ? null : Number(form.price),
+          confirm_accurate: true,
         }),
       }),
     onSuccess: () => {
@@ -95,6 +106,7 @@ export function ClassifiedsPage() {
       qc.invalidateQueries({ queryKey: ['classifieds'] });
       qc.invalidateQueries({ queryKey: ['classifieds-quota'] });
       setShowCreate(false);
+      setDeclareAccurate(false);
       setForm({
         title: '', description: '', category: 'furniture', price: '', currency: 'USD',
         condition_label: 'used', city: city || '', country: country || 'US', contact_whatsapp: '',
@@ -176,6 +188,8 @@ export function ClassifiedsPage() {
               <p className="text-sm leading-relaxed text-slate-600">{selected.description}</p>
             )}
 
+            <SafetyNotice />
+
             <div className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
               <Avatar name={selected.seller_name} src={selected.seller_avatar} className="h-10 w-10" />
               <div className="min-w-0 flex-1">
@@ -232,6 +246,8 @@ export function ClassifiedsPage() {
           {t('classifieds.create')}
         </Button>
       </div>
+
+      <SafetyNotice />
 
       {quota && (
         <p className="text-sm text-slate-500">
@@ -324,6 +340,15 @@ export function ClassifiedsPage() {
                 onChange={(e) => setForm({ ...form, contact_whatsapp: e.target.value })}
               />
             </div>
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={declareAccurate}
+                onChange={(e) => setDeclareAccurate(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 accent-brand-700"
+              />
+              <span>{t('classifieds.declareAccurate')}</span>
+            </label>
             {createError && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 {createError}
@@ -333,7 +358,7 @@ export function ClassifiedsPage() {
               </div>
             )}
             <Button
-              disabled={!form.title.trim() || createListing.isPending || quota?.can_create === false}
+              disabled={!form.title.trim() || !declareAccurate || createListing.isPending || quota?.can_create === false}
               onClick={() => createListing.mutate()}
             >
               {t('classifieds.publish')}

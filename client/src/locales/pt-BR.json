@@ -58,7 +58,22 @@
     "joinCtaDesc": "Crie sua conta em menos de um minuto e comece a se conectar.",
     "joinFree": "Criar conta grátis",
     "registerTitle": "Junte-se à comunidade",
-    "registerSubtitle": "Conte um pouco sobre você e comece a se conectar."
+    "registerSubtitle": "Conte um pouco sobre você e comece a se conectar.",
+    "termsBefore": "Li e aceito os",
+    "termsMid": "e a",
+    "termsAfter": ", e declaro que as informações que adiciono sobre mim, meus negócios e anúncios são verdadeiras e de minha responsabilidade.",
+    "acceptTermsRequired": "Marque a caixa para continuar.",
+    "acceptTermsTitle": "Aceite para continuar",
+    "acceptTermsBody": "Para usar o BR Pelo Mundo, confirme que leu as políticas e que o que você publica sobre si é verdadeiro.",
+    "acceptTermsSubmit": "Concordo e continuar",
+    "checkEmailTitle": "Confirme seu e-mail",
+    "checkEmailBody": "Enviamos um link de confirmação para {{email}}. O login só é liberado depois que você abrir esse link. Ele vale por 48 horas.",
+    "emailNotVerified": "Confirme seu e-mail para entrar. Olhe a caixa de entrada e o spam.",
+    "resendEmail": "Reenviar e-mail de confirmação",
+    "resendSent": "Se o e-mail estiver cadastrado e ainda não confirmado, enviamos um novo link.",
+    "verifyTitle": "Confirmando e-mail",
+    "verifySuccess": "E-mail confirmado. Entrando…",
+    "verifyFailed": "Link inválido ou expirado. Entre e peça um novo envio."
   },
   "onboarding": {
     "step": "Passo {{current}} de {{total}}",
@@ -129,6 +144,8 @@
     "quota": "{{used}} de {{max}} anúncios ativos",
     "upgradeQuota": "Ver planos",
     "limitReached": "Limite de anúncios ativos atingido.",
+    "safetyNotice": "Negocie pessoalmente e desconfie de pagamento antecipado, links suspeitos ou urgência. O BR Pelo Mundo não intermedia a transação nem garante o anúncio.",
+    "declareAccurate": "Declaro que este anúncio é verdadeiro e que sou o responsável por ele.",
     "category": {
       "furniture": "Móveis",
       "electronics": "Eletrônicos",
@@ -453,7 +470,9 @@
     "premiumPlan": "Perfil Premium",
     "premiumBenefits": "Badge no perfil, prioridade no Explorar, estatísticas de visitas e até 3 classificados ativos.",
     "upgradePremium": "Assinar ou renovar",
-    "manageBilling": "Gerenciar planos e pagamentos"
+    "manageBilling": "Gerenciar planos e pagamentos",
+    "legal": "Sobre e políticas",
+    "legalHint": "Quem somos, privacidade, termos de uso e segurança"
   },
   "billing": {
     "title": "Planos e cobrança",
@@ -681,6 +700,43 @@
     "submit": "Salvar e entrar",
     "invalidLink": "Link inválido. Solicite um novo convite.",
     "expired": "Convite inválido ou expirado."
+  },
+  "legal": {
+    "navAbout": "Sobre",
+    "navPrivacy": "Privacidade",
+    "navTerms": "Termos de Uso",
+    "navSafety": "Segurança",
+    "updated": "Atualizado em 1º de outubro de 2026",
+    "backApp": "Voltar ao app",
+    "aboutTitle": "Sobre o BR Pelo Mundo",
+    "aboutBody": [
+      "O BR Pelo Mundo (Comunidade Brasil) é uma rede para brasileiros que vivem fora do país se encontrarem, trocarem informações e apoiarem negócios uns dos outros.",
+      "Aqui você encontra pessoas, serviços, grupos, eventos e classificados perto de onde você está. O que aparece no site é publicado pelos próprios usuários.",
+      "A plataforma organiza essa comunidade. Ela não é banco, imobiliária, agência de empregos nem intermediária das negociações feitas entre as pessoas."
+    ],
+    "privacyTitle": "Política de Privacidade",
+    "privacyBody": [
+      "Coletamos os dados da sua conta (nome, e-mail, usuário e senha criptografada), o que você coloca no perfil, publicações, mensagens, anúncios e os registros técnicos necessários para o site funcionar.",
+      "Usamos esses dados para criar a conta, confirmar o e-mail, mostrar o que você escolhe tornar público e manter a segurança da comunidade. Não vendemos dados pessoais.",
+      "Perfil, feed, negócios e classificados podem ser vistos por outros usuários. Mensagens diretas ficam entre os participantes da conversa e a operação do serviço.",
+      "O e-mail serve para confirmar a conta e enviar avisos do serviço. Hospedagem, envio de e-mail e pagamentos de planos podem ser feitos por prestadores que tratam os dados só para essa finalidade.",
+      "Você pode corrigir o perfil quando quiser. Em Editar perfil dá para excluir a conta: o acesso é desativado e os dados pessoais associados são removidos."
+    ],
+    "termsTitle": "Termos de Uso",
+    "termsBody": [
+      "Ao criar uma conta, ou ao aceitar estes termos numa conta que já existe, você confirma que leu os Termos de Uso e a Política de Privacidade e que as informações que adiciona sobre si, seus negócios e anúncios são verdadeiras e de sua responsabilidade.",
+      "É proibido usar o site para aplicar golpes, pedir pagamento adiantado de forma enganosa, se passar por outra pessoa, publicar conteúdo ilegal, assediar alguém ou manter contas falsas. Nome, foto e dados do perfil precisam ser seus.",
+      "Classificados, vagas e negócios são ofertas dos próprios usuários. O BR Pelo Mundo não participa da negociação, não recebe o pagamento da transação entre usuários e não garante o que foi anunciado.",
+      "Podemos remover conteúdo, limitar funções ou suspender a conta diante de denúncia, indício de fraude ou descumprimento destas regras. Denúncias de perfil, anúncio ou avaliação são feitas dentro do site.",
+      "O uso do site é por sua conta. Não nos responsabilizamos por acordos, prejuízos ou encontros combinados entre usuários."
+    ],
+    "safetyTitle": "Segurança",
+    "safetyBody": [
+      "Desconfie de quem pede dinheiro adiantado, código de verificação, senha, documento ou transferência fora do que foi combinado. Prefira ver o que está comprando antes de pagar e, quando der, combinar pessoalmente.",
+      "Ninguém da equipe pede a sua senha. O selo de verificado, quando aparece, foi conferido pela administração. Ele não significa que a pessoa ou o anúncio está livre de risco.",
+      "Se alguém estiver se passando por outra pessoa, aplicando um golpe ou publicando algo indevido, use Denunciar no perfil, no anúncio ou na avaliação. A administração analisa essas denúncias e pode ocultar o conteúdo ou suspender a conta.",
+      "O login só é liberado depois da confirmação do e-mail. Informação falsa no perfil descumpre os termos e pode levar à suspensão da conta."
+    ]
   },
   "common": {
     "loading": "Carregando...",

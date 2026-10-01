@@ -37,6 +37,8 @@ export const SCHEMA = `
     is_active INTEGER DEFAULT 1,
     email_verified INTEGER DEFAULT 0,
     is_verified INTEGER DEFAULT 0,
+    terms_accepted_at TEXT,
+    terms_version TEXT,
     created_at TEXT NOT NULL DEFAULT utc_now()
   );
 
@@ -253,6 +255,16 @@ export const SCHEMA = `
   );
 
   CREATE TABLE IF NOT EXISTS password_invites (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    email TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL DEFAULT utc_now()
+  );
+
+  CREATE TABLE IF NOT EXISTS email_verifications (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token TEXT UNIQUE NOT NULL,

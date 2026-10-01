@@ -1,3 +1,5 @@
+import { TERMS_VERSION } from '../lib/terms.js';
+
 export type UserRow = {
   id: string;
   email: string;
@@ -10,6 +12,8 @@ export type UserRow = {
   is_active?: number;
   email_verified?: number;
   is_verified?: number;
+  terms_accepted_at?: string | null;
+  terms_version?: string | null;
   created_at: string;
 };
 
@@ -46,6 +50,7 @@ export function publicUser(user: UserRow) {
     is_admin: !!user.is_admin,
     email_verified: !!user.email_verified,
     is_verified: !!user.is_verified,
+    terms_accepted: !!(user.terms_accepted_at && user.terms_version === TERMS_VERSION),
     created_at: user.created_at,
   };
 }

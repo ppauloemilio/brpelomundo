@@ -60,3 +60,60 @@ Equipe Comunidade Brasil`;
   console.log(`📧 Convite de senha enviado para ${email}`);
   return { sent: true, setupUrl };
 }
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return map[char];
+  });
+}
+
+export async function sendVerificationEmail(email: string, token: string, fullName: string) {
+  const verifyUrl = `${APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+  const safeName = escapeHtml(fullName);
+  const subject = 'BR Pelo Mundo — Confirme seu e-mail';
+  const text = `Olá ${fullName},
+
+Confirme seu e-mail para liberar o login no BR Pelo Mundo.
+
+O link vale por 48 horas:
+
+${verifyUrl}
+
+Se você não criou esta conta, ignore este e-mail.
+
+Equipe BR Pelo Mundo`;
+
+  const html = `
+    <p>Olá <strong>${safeName}</strong>,</p>
+    <p>Confirme seu e-mail para liberar o login no <strong>BR Pelo Mundo</strong>.</p>
+    <p><a href="${verifyUrl}" style="display:inline-block;padding:12px 24px;background:#006847;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Confirmar e-mail</a></p>
+    <p style="color:#64748b;font-size:14px">Ou copie este link: ${verifyUrl}</p>
+    <p style="color:#64748b;font-size:14px">O link expira em 48 horas. Se você não criou esta conta, ignore este e-mail.</p>
+  `;
+
+  const transport = getTransport();
+  if (!transport) {
+    console.log('\n📧 [E-mail não configurado] Confirmação de cadastro:');
+    console.log(`   Para: ${email}`);
+    console.log(`   Link: ${verifyUrl}\n`);
+    return { sent: false, verifyUrl };
+  }
+
+  await transport.sendMail({
+    from: SMTP_FROM,
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  console.log(`📧 Confirmação de e-mail enviada para ${email}`);
+  return { sent: true, verifyUrl };
+}

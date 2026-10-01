@@ -24,6 +24,7 @@ export type User = {
   is_premium?: boolean;
   is_verified?: boolean;
   email_verified?: boolean;
+  terms_accepted?: boolean;
   onboarding_completed?: boolean;
   profile?: UserProfile;
 };
@@ -32,7 +33,14 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; username: string; full_name: string; country?: string }) => Promise<void>;
+  register: (data: {
+    email: string;
+    password: string;
+    username: string;
+    full_name: string;
+    country?: string;
+    terms_accepted: boolean;
+  }) => Promise<{ email: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 };
@@ -70,13 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refreshUser();
   };
 
-  const register = async (data: { email: string; password: string; username: string; full_name: string; country?: string }) => {
-    const res = await api<{ token: string; user: User }>('/auth/register', {
+  const register = async (data: {
+    email: string;
+    password: string;
+    username: string;
+    full_name: string;
+    country?: string;
+    terms_accepted: boolean;
+  }) => {
+    const res = await api<{ pending_verification: boolean; email: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    setToken(res.token);
-    await refreshUser();
+    return { email: res.email };
   };
 
   const logout = () => {

@@ -58,7 +58,22 @@
     "joinCtaDesc": "Create your account in under a minute and start connecting.",
     "joinFree": "Create free account",
     "registerTitle": "Join the community",
-    "registerSubtitle": "Tell us a bit about yourself and start connecting."
+    "registerSubtitle": "Tell us a bit about yourself and start connecting.",
+    "termsBefore": "I have read and accept the",
+    "termsMid": "and the",
+    "termsAfter": ", and I declare that the information I add about myself, my businesses, and my listings is true and my responsibility.",
+    "acceptTermsRequired": "Check the box to continue.",
+    "acceptTermsTitle": "Accept to continue",
+    "acceptTermsBody": "To use BR Pelo Mundo, confirm that you read the policies and that what you publish about yourself is true.",
+    "acceptTermsSubmit": "I agree and continue",
+    "checkEmailTitle": "Confirm your email",
+    "checkEmailBody": "We sent a confirmation link to {{email}}. Sign-in is available only after you open that link. It is valid for 48 hours.",
+    "emailNotVerified": "Confirm your email to sign in. Check your inbox and spam folder.",
+    "resendEmail": "Resend confirmation email",
+    "resendSent": "If this email is registered and not yet confirmed, we sent a new link.",
+    "verifyTitle": "Confirming email",
+    "verifySuccess": "Email confirmed. Signing you in…",
+    "verifyFailed": "Invalid or expired link. Sign in and ask for a new one."
   },
   "onboarding": {
     "step": "Step {{current}} of {{total}}",
@@ -129,6 +144,8 @@
     "quota": "{{used}} of {{max}} active listings",
     "upgradeQuota": "See plans",
     "limitReached": "Active listing limit reached.",
+    "safetyNotice": "Meet in person and be wary of upfront payment, suspicious links, or pressure to act fast. BR Pelo Mundo does not broker the deal or guarantee the listing.",
+    "declareAccurate": "I declare that this listing is true and that I am responsible for it.",
     "category": {
       "furniture": "Furniture",
       "electronics": "Electronics",
@@ -453,7 +470,9 @@
     "premiumPlan": "Premium profile",
     "premiumBenefits": "Profile badge, Explore priority, visit stats, and up to 3 active classifieds.",
     "upgradePremium": "Subscribe or renew",
-    "manageBilling": "Manage plans and payments"
+    "manageBilling": "Manage plans and payments",
+    "legal": "About and policies",
+    "legalHint": "Who we are, privacy, terms of use, and safety"
   },
   "billing": {
     "title": "Plans & billing",
@@ -681,6 +700,43 @@
     "submit": "Save and sign in",
     "invalidLink": "Invalid link. Request a new invite.",
     "expired": "Invalid or expired invite."
+  },
+  "legal": {
+    "navAbout": "About",
+    "navPrivacy": "Privacy",
+    "navTerms": "Terms of Use",
+    "navSafety": "Safety",
+    "updated": "Updated October 1, 2026",
+    "backApp": "Back to the app",
+    "aboutTitle": "About BR Pelo Mundo",
+    "aboutBody": [
+      "BR Pelo Mundo (Comunidade Brasil) is a network for Brazilians living abroad to meet, share information, and support each other's businesses.",
+      "Here you find people, services, groups, events, and classifieds near where you are. What appears on the site is published by the users themselves.",
+      "The platform organizes this community. It is not a bank, a real-estate agency, a job agency, or a broker for deals made between people."
+    ],
+    "privacyTitle": "Privacy Policy",
+    "privacyBody": [
+      "We collect your account data (name, email, username, and encrypted password), what you put on your profile, posts, messages, listings, and the technical records needed to run the site.",
+      "We use this data to create the account, confirm the email, show what you choose to make public, and keep the community safe. We do not sell personal data.",
+      "Profile, feed, businesses, and classifieds can be seen by other users. Direct messages stay between the people in the conversation and the operation of the service.",
+      "Email is used to confirm the account and send service notices. Hosting, email delivery, and paid-plan payments may be handled by providers that process the data only for that purpose.",
+      "You can correct your profile at any time. In Edit profile you can delete the account: access is deactivated and the personal data tied to it is removed."
+    ],
+    "termsTitle": "Terms of Use",
+    "termsBody": [
+      "By creating an account, or by accepting these terms on an account that already exists, you confirm that you read the Terms of Use and the Privacy Policy and that the information you add about yourself, your businesses, and your listings is true and your responsibility.",
+      "You may not use the site to run scams, ask for misleading upfront payment, impersonate someone else, post illegal content, harass anyone, or keep fake accounts. The name, photo, and profile details must be yours.",
+      "Classifieds, jobs, and businesses are offers from the users themselves. BR Pelo Mundo does not take part in the deal, does not receive the payment of a transaction between users, and does not guarantee what was advertised.",
+      "We may remove content, limit features, or suspend an account when there is a report, a sign of fraud, or a breach of these rules. Reports of a profile, listing, or review are made inside the site.",
+      "You use the site at your own risk. We are not responsible for agreements, losses, or meetings arranged between users."
+    ],
+    "safetyTitle": "Safety",
+    "safetyBody": [
+      "Be wary of anyone who asks for money upfront, a verification code, your password, a document, or a transfer outside what you agreed. Prefer to see what you are buying before you pay and, when you can, meet in person.",
+      "No one on the team will ask for your password. A verified badge, when it appears, was checked by the administration. It does not mean the person or the listing is risk-free.",
+      "If someone is impersonating another person, running a scam, or posting something they should not, use Report on the profile, the listing, or the review. The administration reviews those reports and may hide the content or suspend the account.",
+      "Sign-in is available only after the email is confirmed. False information on a profile breaks the terms and can lead to the account being suspended."
+    ]
   },
   "common": {
     "loading": "Loading...",

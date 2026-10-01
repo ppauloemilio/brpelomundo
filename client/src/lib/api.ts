@@ -20,6 +20,18 @@ export function assetUrl(url?: string | null): string | undefined {
   return url;
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers: Record<string, string> = {
@@ -31,7 +43,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const res = await fetch(apiUrl(`/api${path}`), { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    throw new ApiError(err.error || `HTTP ${res.status}`, res.status, err.code);
   }
   return res.json();
 }

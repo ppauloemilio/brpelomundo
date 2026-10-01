@@ -1,10 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Shield, ChevronRight, Sparkles, CreditCard } from 'lucide-react';
 import i18n from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { legalLinks } from '@/components/legal/LegalFooter';
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -74,6 +75,24 @@ export function SettingsPage() {
           </CardContent>
         </Card>
       )}
+      <Card>
+        <CardHeader><CardTitle className="text-base">{t('settings.legal')}</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm text-slate-500">{t('settings.legalHint')}</p>
+          <div className="flex flex-col">
+            {legalLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              >
+                {t(link.labelKey)}
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader><CardTitle className="text-base">{t('settings.language')}</CardTitle></CardHeader>
         <CardContent className="flex gap-2">

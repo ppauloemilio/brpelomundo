@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight } from 'lucide-react';
 import i18n from '@/i18n';
+import { ApiError, api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthHero } from '@/components/auth/AuthHero';
+import { LegalFooter } from '@/components/legal/LegalFooter';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
@@ -16,6 +18,8 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resent, setResent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const changeLang = (lang: string) => {
@@ -27,11 +31,18 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setNeedsVerification(false);
+    setResent(false);
     try {
       await login(email, password);
       navigate('/home');
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.error'));
+      if (err instanceof ApiError && err.code === 'EMAIL_NOT_VERIFIED') {
+        setNeedsVerification(true);
+        setError(t('auth.emailNotVerified'));
+      } else {
+        setError(err instanceof Error ? err.message : t('common.error'));
+      }
     } finally {
       setLoading(false);
     }
@@ -110,6 +121,26 @@ export function LoginPage() {
               </p>
             )}
 
+            {needsVerification && (
+              <div className="space-y-2">
+                {resent && <p className="text-sm text-brand-800">{t('auth.resendSent')}</p>}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={async () => {
+                    await api('/auth/resend-verification', {
+                      method: 'POST',
+                      body: JSON.stringify({ email }),
+                    });
+                    setResent(true);
+                  }}
+                >
+                  {t('auth.resendEmail')}
+                </Button>
+              </div>
+            )}
+
             <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={loading}>
               {loading ? t('common.loading') : t('auth.enterCommunity')}
               {!loading && <ArrowRight className="h-4 w-4" />}
@@ -128,6 +159,7 @@ export function LoginPage() {
               {t('auth.joinFree')}
             </Button>
           </div>
+          <LegalFooter className="mt-8" />
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
+import { AcceptTermsGate } from '@/components/legal/AcceptTermsGate';
 
 const mainNav = [
   { to: '/feed', icon: Home, labelKey: 'nav.feed' },
@@ -51,6 +52,7 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
+      <AcceptTermsGate />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 lg:px-6">
           <button type="button" className="lg:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">

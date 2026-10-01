@@ -126,11 +126,16 @@ router.get('/:id', authMiddleware, async (req, res) => {
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   const {
     title, description, category, price, currency, condition_label,
-    city, country, photos, contact_whatsapp,
+    city, country, photos, contact_whatsapp, confirm_accurate,
   } = req.body;
 
   if (!title?.trim() || !category?.trim() || !city?.trim() || !country?.trim()) {
     return res.status(400).json({ error: 'Título, categoria, cidade e país são obrigatórios' });
+  }
+  if (confirm_accurate !== true) {
+    return res.status(400).json({
+      error: 'Confirme que o anúncio é verdadeiro e de sua responsabilidade',
+    });
   }
   if (!CATEGORIES.includes(category)) {
     return res.status(400).json({ error: 'Categoria inválida' });

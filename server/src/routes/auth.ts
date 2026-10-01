@@ -5,13 +5,21 @@ import { db } from '../db/sql.js';
 import { parseJson, publicUser, UserRow } from '../db/database.js';
 import { authMiddleware, AuthRequest, signToken } from '../middleware/auth.js';
 import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
+import { TERMS_VERSION } from '../lib/terms.js';
+import { issueEmailVerification } from '../lib/emailVerification.js';
 
 const router = Router();
 
 router.post('/register', async (req, res) => {
-  const { email, password, username, full_name, country = 'BR' } = req.body;
+  const { email, password, username, full_name, country = 'BR', terms_accepted } = req.body;
   if (!email || !password || !username || !full_name) {
     return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
+  }
+  if (terms_accepted !== true) {
+    return res.status(400).json({
+      error: 'É preciso aceitar os termos e declarar que as informações são verdadeiras',
+      code: 'TERMS_REQUIRED',
+    });
   }
   const existing = await db.get('SELECT id FROM users WHERE email = ? OR username = ?', [
     email,
@@ -21,9 +29,11 @@ router.post('/register', async (req, res) => {
 
   const id = uuid();
   const hash = bcrypt.hashSync(password, 10);
+  const acceptedAt = new Date().toISOString();
   await db.run(
-    'INSERT INTO users (id, email, password_hash, username, full_name) VALUES (?, ?, ?, ?, ?)',
-    [id, email, hash, username, full_name]
+    `INSERT INTO users (id, email, password_hash, username, full_name, email_verified, terms_accepted_at, terms_version)
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+    [id, email, hash, username, full_name, acceptedAt, TERMS_VERSION]
   );
   await db.run('INSERT INTO public_profiles (user_id, current_country) VALUES (?, ?)', [id, country]);
   await db.run(
@@ -31,8 +41,13 @@ router.post('/register', async (req, res) => {
     [uuid(), id, country, new Date().toISOString()]
   );
 
-  const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [id]);
-  res.status(201).json({ token: signToken(id), user: publicUser(user!) });
+  try {
+    await issueEmailVerification(id, email, full_name);
+  } catch (err) {
+    console.error('Falha ao enviar confirmação de e-mail:', err);
+  }
+
+  res.status(201).json({ pending_verification: true, email });
 });
 
 router.post('/login', async (req, res) => {
@@ -48,7 +63,80 @@ router.post('/login', async (req, res) => {
   if (!bcrypt.compareSync(password, found.password_hash)) {
     return res.status(401).json({ error: 'Credenciais inválidas' });
   }
+  if (found.email_verified !== 1) {
+    return res.status(403).json({
+      error: 'Confirme seu e-mail para entrar. Olhe a caixa de entrada e o spam.',
+      code: 'EMAIL_NOT_VERIFIED',
+    });
+  }
   res.json({ token: signToken(found.id), user: publicUser(found) });
+});
+
+router.post('/verify-email', async (req, res) => {
+  const token = String(req.body?.token || '');
+  if (!token) return res.status(400).json({ error: 'Link inválido' });
+
+  const row = await db.get<{
+    id: string;
+    user_id: string;
+    expires_at: string;
+    used_at: string | null;
+  }>('SELECT * FROM email_verifications WHERE token = ?', [token]);
+  if (!row) return res.status(404).json({ error: 'Link inválido ou já utilizado' });
+
+  const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [row.user_id]);
+  if (!user || user.is_active === 0) {
+    return res.status(403).json({ error: 'Conta desativada. Entre em contato com o suporte.' });
+  }
+
+  const usedRecently = !!row.used_at && Date.now() - new Date(row.used_at).getTime() < 2 * 60 * 1000;
+  if (row.used_at && !usedRecently) {
+    return res.status(404).json({ error: 'Link inválido ou já utilizado' });
+  }
+  if (!row.used_at && new Date(row.expires_at) < new Date()) {
+    return res.status(410).json({ error: 'Link expirado. Peça um novo na tela de login.' });
+  }
+
+  if (!row.used_at) {
+    await db.run('UPDATE users SET email_verified = 1 WHERE id = ?', [row.user_id]);
+    await db.run('UPDATE email_verifications SET used_at = utc_now() WHERE id = ?', [row.id]);
+  }
+
+  const fresh = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [row.user_id]);
+  res.json({ token: signToken(fresh!.id), user: publicUser(fresh!) });
+});
+
+router.post('/resend-verification', async (req, res) => {
+  const email = String(req.body?.email || '').trim();
+  if (email) {
+    const user = await db.get<UserRow>(
+      'SELECT * FROM users WHERE lower(email) = lower(?)',
+      [email]
+    );
+    if (user && user.is_active !== 0 && user.email_verified !== 1 && user.password_set !== 0) {
+      try {
+        await issueEmailVerification(user.id, user.email, user.full_name);
+      } catch (err) {
+        console.error('Falha ao reenviar confirmação de e-mail:', err);
+      }
+    }
+  }
+  res.json({ ok: true });
+});
+
+router.post('/accept-terms', authMiddleware, async (req: AuthRequest, res) => {
+  if (req.body?.accepted !== true) {
+    return res.status(400).json({
+      error: 'É preciso aceitar os termos e declarar que as informações são verdadeiras',
+      code: 'TERMS_REQUIRED',
+    });
+  }
+  await db.run(
+    'UPDATE users SET terms_accepted_at = ?, terms_version = ? WHERE id = ?',
+    [new Date().toISOString(), TERMS_VERSION, req.user!.id]
+  );
+  const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [req.user!.id]);
+  res.json({ user: publicUser(user!) });
 });
 
 router.get('/invite/:token', async (req, res) => {
@@ -80,10 +168,14 @@ router.post('/setup-password', async (req, res) => {
   }
 
   const hash = bcrypt.hashSync(password, 10);
-  await db.run('UPDATE users SET password_hash = ?, password_set = 1 WHERE id = ?', [
-    hash,
-    invite.user_id,
-  ]);
+  await db.run(
+    'UPDATE users SET password_hash = ?, password_set = 1, email_verified = 1 WHERE id = ?',
+    [hash, invite.user_id]
+  );
+  await db.run(
+    'UPDATE email_verifications SET used_at = utc_now() WHERE user_id = ? AND used_at IS NULL',
+    [invite.user_id]
+  );
   await db.run(`UPDATE password_invites SET used_at = utc_now() WHERE id = ?`, [invite.id]);
 
   const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [invite.user_id]);
