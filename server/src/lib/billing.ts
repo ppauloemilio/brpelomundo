@@ -159,9 +159,9 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
   {
     code: 'featured_business_30d',
     product_type: 'featured_business',
-    name: 'Negócio em destaque (30 dias)',
-    description: 'Seu negócio aparece primeiro no mapa e nas listas.',
-    price_cents: 2999,
+    name: 'Destaque no mapa inteiro (30 dias)',
+    description: 'Seu negócio aparece primeiro no mapa e nas listas, em qualquer cidade.',
+    price_cents: 3499,
     currency: 'USD',
     duration_days: 30,
     sort_order: 3,

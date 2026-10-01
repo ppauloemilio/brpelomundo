@@ -45,9 +45,9 @@ const EXTRA_PLANS = [
   {
     code: 'local_business_30d',
     product_type: 'local_business',
-    name: 'Destaque local no mapa (30 dias)',
-    description: 'Seu negócio aparece primeiro no mapa da sua cidade.',
-    price_cents: 3499,
+    name: 'Destaque só na cidade (30 dias)',
+    description: 'Seu negócio aparece primeiro apenas no mapa da cidade dele. O alcance é menor que o destaque no mapa inteiro.',
+    price_cents: 2999,
     currency: 'USD',
     duration_days: 30,
     sort_order: 10,
@@ -156,9 +156,39 @@ export async function migrateSchema() {
   `);
   await migrateBillingPlans();
   await migrateAdCampaignComboPlan();
+  await fixMapHighlightPricing();
   await restoreSmokeTestBio();
   await backfillAdCampaignOwners();
   await grandfatherEmailVerification();
+}
+
+/** O alcance menor (só a cidade) passa a custar menos que o mapa inteiro. Roda uma vez. */
+async function fixMapHighlightPricing() {
+  const flag = await db.get<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = 'map_highlight_pricing_v1'`
+  );
+  if (flag) return;
+
+  await db.run(
+    `UPDATE billing_plans SET name = ?, description = ?, price_cents = ? WHERE code = 'featured_business_30d'`,
+    [
+      'Destaque no mapa inteiro (30 dias)',
+      'Seu negócio aparece primeiro no mapa e nas listas, em qualquer cidade.',
+      3499,
+    ]
+  );
+  await db.run(
+    `UPDATE billing_plans SET name = ?, description = ?, price_cents = ? WHERE code = 'local_business_30d'`,
+    [
+      'Destaque só na cidade (30 dias)',
+      'Seu negócio aparece primeiro apenas no mapa da cidade dele. O alcance é menor que o destaque no mapa inteiro.',
+      2999,
+    ]
+  );
+  await db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('map_highlight_pricing_v1', '1')
+     ON CONFLICT (key) DO NOTHING`
+  );
 }
 
 /** Contas criadas antes da confirmação de e-mail continuam podendo entrar. Roda uma vez. */

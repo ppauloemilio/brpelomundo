@@ -5,15 +5,18 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
+import { groupPlans } from '@/lib/planGroups';
 
 type AdminPlan = {
   id: string;
   code: string;
+  product_type: string;
   name: string;
   description: string;
   price_cents: number;
   currency: string;
   duration_days: number;
+  sort_order?: number;
   is_active: number;
   promo_price_cents?: number | null;
   promo_label?: string | null;
@@ -141,14 +144,19 @@ export function AdminBillingPanel() {
             <h3 className="font-semibold text-slate-900">{t('admin.plansEditor')}</h3>
             <p className="text-xs text-slate-500">{t('admin.plansEditorHint')}</p>
           </div>
-          <div className="space-y-4">
-            {plans.map((plan) => (
-              <PlanEditor
-                key={plan.id}
-                plan={plan}
-                saving={patchPlan.isPending}
-                onSave={(body) => patchPlan.mutate({ id: plan.id, body })}
-              />
+          <div className="space-y-6">
+            {groupPlans(plans).map((group) => (
+              <section key={group.id} className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-800">{t(`billing.group.${group.id}`)}</h4>
+                {group.plans.map((plan) => (
+                  <PlanEditor
+                    key={plan.id}
+                    plan={plan}
+                    saving={patchPlan.isPending}
+                    onSave={(body) => patchPlan.mutate({ id: plan.id, body })}
+                  />
+                ))}
+              </section>
             ))}
           </div>
         </CardContent>
@@ -318,17 +326,22 @@ function PlanEditor({
       </div>
       <Input value={name} onChange={(e) => setName(e.target.value)} />
       <div className="grid gap-2 sm:grid-cols-2">
-        <Input
-          placeholder={t('admin.planPrice')}
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-        />
-        <Input
-          type="number"
-          placeholder={t('admin.planDays')}
-          value={days}
-          onChange={(e) => setDays(e.target.value)}
-        />
+        <label className="space-y-1 text-xs font-medium text-slate-600">
+          <span>{t('admin.planPrice')}</span>
+          <Input
+            inputMode="decimal"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+        </label>
+        <label className="space-y-1 text-xs font-medium text-slate-600">
+          <span>{t('admin.planDays')}</span>
+          <Input
+            type="number"
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+          />
+        </label>
         <Input
           placeholder={t('admin.planPromoPrice')}
           value={promoPrice}

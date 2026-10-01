@@ -14,6 +14,7 @@ import {
   emptyAdCampaignForm,
 } from '@/components/billing/AdCampaignPanel';
 import { adCampaignModeFromPlanCode, isAdCampaignPlan } from '@/lib/adPlacements';
+import { groupPlans } from '@/lib/planGroups';
 
 type Plan = {
   id: string;
@@ -24,6 +25,7 @@ type Plan = {
   price_cents: number;
   currency: string;
   duration_days: number;
+  sort_order?: number;
   effective_price_cents?: number;
   original_price_cents?: number;
   has_promo?: boolean;
@@ -102,6 +104,7 @@ export function PricingPage() {
     queryFn: () => api<Array<{ id: string; plan_name: string; amount_cents: number; currency: string; status: string; paid_at: string; ends_at: string }>>('/billing/orders'),
   });
 
+  const planGroups = useMemo(() => groupPlans(plans), [plans]);
   const plan = useMemo(() => plans.find((p) => p.code === selected), [plans, selected]);
   const payCents = plan?.effective_price_cents ?? plan?.price_cents ?? 0;
   const adCampaignMode = plan ? adCampaignModeFromPlanCode(plan.code) : null;
@@ -186,50 +189,72 @@ export function PricingPage() {
       {isLoading ? (
         <p className="text-slate-500">{t('common.loading')}</p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {plans.map((p) => (
-            <button
-              key={p.code}
-              type="button"
-              onClick={() => {
-                setSelected(p.code);
-                setTargetId('');
-                setAdCreativeFeed(emptyAdCampaignForm());
-                setAdCreativeSidebar(emptyAdCampaignForm());
-                setDoneMsg(null);
-                setError(null);
-              }}
+        <div className="space-y-8">
+          {planGroups.map((group) => (
+            <section
+              key={group.id}
               className={cn(
-                'rounded-2xl border p-4 text-left transition',
-                selected === p.code
-                  ? 'border-brand-500 bg-brand-50/60 ring-2 ring-brand-200'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
+                'space-y-3',
+                group.id === 'ads' && 'rounded-2xl border border-slate-200 bg-slate-50 p-4'
               )}
             >
-              <div className="flex items-start justify-between gap-2">
-                <h2 className="font-semibold text-slate-900">{p.name}</h2>
-                <div className="flex items-center gap-1">
-                  {p.has_promo && (
-                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                      {p.promo_badge || 'Promo'}
-                    </span>
-                  )}
-                  {selected === p.code && <Check className="h-5 w-5 text-brand-600" />}
-                </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">{t(`billing.group.${group.id}`)}</h2>
+                <p className="mt-1 text-sm text-slate-500">{t(`billing.groupHint.${group.id}`)}</p>
               </div>
-              <p className="mt-1 text-sm text-slate-500">{p.description}</p>
-              <p className="mt-3 text-lg font-bold text-brand-800">
-                {formatMoney(p.effective_price_cents ?? p.price_cents, p.currency)}
-                {p.has_promo && (
-                  <span className="ml-2 text-sm font-normal text-slate-400 line-through">
-                    {formatMoney(p.original_price_cents ?? p.price_cents, p.currency)}
-                  </span>
-                )}
-                <span className="ml-1 text-xs font-medium text-slate-500">
-                  / {p.duration_days}{t('billing.daysShort')}
-                </span>
-              </p>
-            </button>
+              <div className="grid gap-3 md:grid-cols-2">
+                {group.plans.map((p) => (
+                  <button
+                    key={p.code}
+                    type="button"
+                    onClick={() => {
+                      setSelected(p.code);
+                      setTargetId('');
+                      setAdCreativeFeed(emptyAdCampaignForm());
+                      setAdCreativeSidebar(emptyAdCampaignForm());
+                      setDoneMsg(null);
+                      setError(null);
+                    }}
+                    className={cn(
+                      'rounded-2xl border p-4 text-left transition',
+                      selected === p.code
+                        ? 'border-brand-500 bg-brand-50/60 ring-2 ring-brand-200'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-slate-900">{p.name}</h3>
+                      <div className="flex items-center gap-1">
+                        {p.has_promo && (
+                          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                            {p.promo_badge || 'Promo'}
+                          </span>
+                        )}
+                        {selected === p.code && <Check className="h-5 w-5 text-brand-600" />}
+                      </div>
+                    </div>
+                    {p.product_type === 'featured_business' && (
+                      <p className="mt-1 text-sm font-medium text-brand-800">{t('billing.mapWorldwide')}</p>
+                    )}
+                    {p.product_type === 'local_business' && (
+                      <p className="mt-1 text-sm font-medium text-brand-800">{t('billing.mapCityOnly')}</p>
+                    )}
+                    <p className="mt-1 text-sm text-slate-500">{p.description}</p>
+                    <p className="mt-3 text-lg font-bold text-brand-800">
+                      {formatMoney(p.effective_price_cents ?? p.price_cents, p.currency)}
+                      {p.has_promo && (
+                        <span className="ml-2 text-sm font-normal text-slate-400 line-through">
+                          {formatMoney(p.original_price_cents ?? p.price_cents, p.currency)}
+                        </span>
+                      )}
+                      <span className="ml-1 text-xs font-medium text-slate-500">
+                        / {p.duration_days}{t('billing.daysShort')}
+                      </span>
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
