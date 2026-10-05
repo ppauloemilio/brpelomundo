@@ -38,6 +38,14 @@ export function PostsSection() {
     },
   });
 
+  const deletePost = useMutation({
+    mutationFn: (id: string) => api(`/admin/posts/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-posts-manage'] });
+      qc.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+  });
+
   const patchPost = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, boolean> }) =>
       api(`/admin/posts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -109,6 +117,16 @@ export function PostsSection() {
                     onClick={() => patchPost.mutate({ id: p.id, body: { is_active: !p.is_active } })}
                   >
                     {p.is_active ? t('admin.deactivate') : t('admin.activate')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={deletePost.isPending}
+                    onClick={() => {
+                      if (window.confirm(t('admin.deletePostConfirm'))) deletePost.mutate(p.id);
+                    }}
+                  >
+                    {t('common.delete')}
                   </Button>
                 </div>
               </CardContent>

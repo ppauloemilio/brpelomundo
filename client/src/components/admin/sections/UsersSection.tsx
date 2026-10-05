@@ -44,6 +44,14 @@ export function UsersSection() {
     },
   });
 
+  const deleteUser = useMutation({
+    mutationFn: (id: string) => api(`/admin/users/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-users-manage'] });
+      qc.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+  });
+
   const patchUser = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, boolean> }) =>
       api(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -136,6 +144,20 @@ export function UsersSection() {
                     >
                       {u.is_active ? t('admin.deactivate') : t('admin.activate')}
                     </Button>
+                    {u.id !== user?.id && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={deleteUser.isPending}
+                        onClick={() => {
+                          if (window.confirm(t('admin.deleteUserConfirm', { name: u.full_name }))) {
+                            deleteUser.mutate(u.id);
+                          }
+                        }}
+                      >
+                        {t('common.delete')}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>

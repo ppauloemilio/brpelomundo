@@ -2,7 +2,7 @@ import { ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, FileText, Building2, DollarSign, Megaphone, ArrowLeft, Settings, ShieldAlert,
+  LayoutDashboard, Users, FileText, Building2, DollarSign, Megaphone, ArrowLeft, Settings, ShieldAlert, Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -13,14 +13,16 @@ import { BusinessesSection } from '@/components/admin/sections/BusinessesSection
 import { MonetizationSection } from '@/components/admin/sections/MonetizationSection';
 import { AdsSection } from '@/components/admin/sections/AdsSection';
 import { ReportsSection } from '@/components/admin/sections/ReportsSection';
+import { ContentSection } from '@/components/admin/sections/ContentSection';
 
-export type AdminSection = 'dashboard' | 'users' | 'posts' | 'businesses' | 'monetization' | 'ads' | 'reports';
+export type AdminSection = 'dashboard' | 'users' | 'posts' | 'businesses' | 'content' | 'monetization' | 'ads' | 'reports';
 
 const NAV: { key: AdminSection; labelKey: string; icon: typeof LayoutDashboard }[] = [
   { key: 'dashboard', labelKey: 'admin.tabDashboard', icon: LayoutDashboard },
   { key: 'users', labelKey: 'admin.tabUsers', icon: Users },
   { key: 'posts', labelKey: 'admin.tabPostsManage', icon: FileText },
   { key: 'businesses', labelKey: 'admin.tabBusinesses', icon: Building2 },
+  { key: 'content', labelKey: 'admin.tabContent', icon: Tag },
   { key: 'reports', labelKey: 'admin.tabReports', icon: ShieldAlert },
   { key: 'monetization', labelKey: 'admin.tabMonetization', icon: DollarSign },
   { key: 'ads', labelKey: 'admin.tabAds', icon: Megaphone },
@@ -54,6 +56,7 @@ export function AdminPage() {
     users: t('admin.tabUsers'),
     posts: t('admin.tabPostsManage'),
     businesses: t('admin.tabBusinesses'),
+    content: t('admin.tabContent'),
     reports: t('admin.tabReports'),
     monetization: t('admin.tabMonetization'),
     ads: t('admin.tabAds'),
@@ -93,6 +96,7 @@ export function AdminPage() {
           {section === 'users' && <UsersSection />}
           {section === 'posts' && <PostsSection />}
           {section === 'businesses' && <BusinessesSection />}
+          {section === 'content' && <ContentSection />}
           {section === 'reports' && <ReportsSection />}
           {section === 'monetization' && <MonetizationSection />}
           {section === 'ads' && <AdsSection />}

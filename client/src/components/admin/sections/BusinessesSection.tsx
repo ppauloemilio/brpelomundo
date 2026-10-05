@@ -36,6 +36,14 @@ export function BusinessesSection() {
     },
   });
 
+  const deleteBusiness = useMutation({
+    mutationFn: (id: string) => api(`/admin/businesses/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-businesses-manage'] });
+      qc.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+  });
+
   const patchBusiness = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, boolean> }) =>
       api(`/admin/businesses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -105,6 +113,18 @@ export function BusinessesSection() {
                     onClick={() => patchBusiness.mutate({ id: b.id, body: { is_active: !b.is_active } })}
                   >
                     {b.is_active ? t('admin.deactivate') : t('admin.activate')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={deleteBusiness.isPending}
+                    onClick={() => {
+                      if (window.confirm(t('admin.deleteBusinessConfirm', { name: b.name }))) {
+                        deleteBusiness.mutate(b.id);
+                      }
+                    }}
+                  >
+                    {t('common.delete')}
                   </Button>
                 </div>
               </CardContent>

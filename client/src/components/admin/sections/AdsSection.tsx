@@ -76,7 +76,15 @@ export function AdsSection() {
               <Button size="sm" variant={ad.is_active ? 'outline' : 'default'} onClick={() => toggleAd.mutate({ id: ad.id, is_active: !ad.is_active })}>
                 {ad.is_active ? t('admin.deactivate') : t('admin.activate')}
               </Button>
-              <Button size="sm" variant="destructive" onClick={() => deleteAd.mutate(ad.id)}>{t('common.delete')}</Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  if (window.confirm(t('admin.deleteAdConfirm', { name: ad.title }))) deleteAd.mutate(ad.id);
+                }}
+              >
+                {t('common.delete')}
+              </Button>
             </div>
           </CardContent>
         </Card>

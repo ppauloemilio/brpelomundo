@@ -8,6 +8,7 @@ import { ADMIN_EMAIL, createPasswordInvite } from '../lib/adminUser.js';
 import { applyMonetizationExamples } from '../lib/seedMonetizationExamples.js';
 import { sendPasswordInviteEmail } from '../lib/email.js';
 import { paramId } from '../lib/params.js';
+import { deleteAccount } from '../lib/deleteAccount.js';
 import { revenueSummary, adMetricsSummary, listAllPlans, updatePlan, listPromotions, createPromotion, updatePromotion, deletePromotion, grantComplimentary } from '../lib/billing.js';
 
 const router = Router();
@@ -312,6 +313,116 @@ router.patch('/users/:id', async (req: AuthRequest, res) => {
       ]);
     }
   }
+  res.json({ ok: true });
+});
+
+router.delete('/users/:id', async (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
+  if (id === req.user!.id) {
+    return res.status(400).json({ error: 'Você não pode excluir sua própria conta por aqui' });
+  }
+  const user = await db.get('SELECT id FROM users WHERE id = ?', [id]);
+  if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+  await deleteAccount(id);
+  res.json({ ok: true });
+});
+
+router.delete('/posts/:id', async (req, res) => {
+  const id = paramId(req.params.id);
+  const post = await db.get('SELECT id FROM posts WHERE id = ?', [id]);
+  if (!post) return res.status(404).json({ error: 'Post não encontrado' });
+  await db.run('UPDATE comments SET is_active = 0 WHERE post_id = ?', [id]);
+  await db.run('UPDATE posts SET is_active = 0 WHERE id = ?', [id]);
+  res.json({ ok: true });
+});
+
+router.delete('/businesses/:id', async (req, res) => {
+  const id = paramId(req.params.id);
+  const biz = await db.get('SELECT id FROM businesses WHERE id = ?', [id]);
+  if (!biz) return res.status(404).json({ error: 'Negócio não encontrado' });
+  await db.run('UPDATE businesses SET is_active = 0, is_featured = 0 WHERE id = ?', [id]);
+  res.json({ ok: true });
+});
+
+router.get('/classifieds', async (req, res) => {
+  const q = (req.query.q as string)?.trim();
+  const conditions: string[] = ['1=1'];
+  const params: string[] = [];
+  if (q) {
+    conditions.push('(c.title ILIKE ? OR u.full_name ILIKE ? OR u.email ILIKE ?)');
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  }
+  const rows = await db.all(
+    `SELECT c.id, c.title, c.city, c.country, c.status, c.is_active, c.created_at,
+            u.full_name AS seller_name, u.email AS seller_email
+     FROM classifieds c JOIN users u ON u.id = c.seller_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY c.created_at DESC LIMIT 100`,
+    params
+  );
+  res.json(rows);
+});
+
+router.delete('/classifieds/:id', async (req, res) => {
+  const id = paramId(req.params.id);
+  const row = await db.get('SELECT id FROM classifieds WHERE id = ?', [id]);
+  if (!row) return res.status(404).json({ error: 'Anúncio não encontrado' });
+  await db.run(`UPDATE classifieds SET is_active = 0, status = 'inactive', is_featured = 0 WHERE id = ?`, [id]);
+  res.json({ ok: true });
+});
+
+router.get('/events', async (req, res) => {
+  const q = (req.query.q as string)?.trim();
+  const conditions: string[] = ['1=1'];
+  const params: string[] = [];
+  if (q) {
+    conditions.push('(e.title ILIKE ? OR u.full_name ILIKE ?)');
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  const rows = await db.all(
+    `SELECT e.id, e.title, e.city, e.country, e.event_date, e.is_active, e.created_at,
+            u.full_name AS organizer_name
+     FROM community_events e JOIN users u ON u.id = e.organizer_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY e.created_at DESC LIMIT 100`,
+    params
+  );
+  res.json(rows);
+});
+
+router.delete('/events/:id', async (req, res) => {
+  const id = paramId(req.params.id);
+  const row = await db.get('SELECT id FROM community_events WHERE id = ?', [id]);
+  if (!row) return res.status(404).json({ error: 'Evento não encontrado' });
+  await db.run('UPDATE community_events SET is_active = 0, is_sponsored = 0 WHERE id = ?', [id]);
+  res.json({ ok: true });
+});
+
+router.get('/groups', async (req, res) => {
+  const q = (req.query.q as string)?.trim();
+  const conditions: string[] = ['1=1'];
+  const params: string[] = [];
+  if (q) {
+    conditions.push('(g.name ILIKE ? OR u.full_name ILIKE ?)');
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  const rows = await db.all(
+    `SELECT g.id, g.name, g.city, g.country, g.is_active, g.members_count, g.created_at,
+            u.full_name AS owner_name
+     FROM community_groups g JOIN users u ON u.id = g.owner_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY g.created_at DESC LIMIT 100`,
+    params
+  );
+  res.json(rows);
+});
+
+router.delete('/groups/:id', async (req, res) => {
+  const id = paramId(req.params.id);
+  const row = await db.get('SELECT id FROM community_groups WHERE id = ?', [id]);
+  if (!row) return res.status(404).json({ error: 'Grupo não encontrado' });
+  await db.run('UPDATE group_posts SET is_active = 0 WHERE group_id = ?', [id]);
+  await db.run('UPDATE community_groups SET is_active = 0 WHERE id = ?', [id]);
   res.json({ ok: true });
 });
 
