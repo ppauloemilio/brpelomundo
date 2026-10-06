@@ -127,7 +127,8 @@ router.get('/', authMiddleware, async (req, res) => {
     users = await db.all<UserRow>(
       `SELECT u.* FROM users u
        LEFT JOIN public_profiles p ON p.user_id = u.id
-       WHERE (u.full_name ILIKE ? OR u.username ILIKE ?)
+       WHERE COALESCE(u.is_active, 1) = 1
+         AND (u.full_name ILIKE ? OR u.username ILIKE ?)
        ${country ? 'AND p.current_country = ?' : ''}
        LIMIT 50`,
       country ? [`%${q}%`, `%${q}%`, country] : [`%${q}%`, `%${q}%`]
@@ -136,11 +137,11 @@ router.get('/', authMiddleware, async (req, res) => {
     users = await db.all<UserRow>(
       `SELECT u.* FROM users u
        JOIN public_profiles p ON p.user_id = u.id
-       WHERE p.current_country = ? LIMIT 50`,
+       WHERE COALESCE(u.is_active, 1) = 1 AND p.current_country = ? LIMIT 50`,
       [country]
     );
   } else {
-    users = await db.all<UserRow>('SELECT * FROM users LIMIT 50');
+    users = await db.all<UserRow>('SELECT * FROM users WHERE COALESCE(is_active, 1) = 1 LIMIT 50');
   }
 
   const settings = await getMonetizationSettings();
@@ -206,7 +207,9 @@ router.get('/:id/businesses', authMiddleware, async (req, res) => {
 
 router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
   const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [paramId(req.params.id)]);
-  if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+  if (!user || (user.is_active === 0 && req.user!.id !== user.id)) {
+    return res.status(404).json({ error: 'Usuário não encontrado' });
+  }
 
   const [profile, skills, stats, settings] = await Promise.all([
     db.get<Record<string, unknown>>('SELECT * FROM public_profiles WHERE user_id = ?', [user.id]),

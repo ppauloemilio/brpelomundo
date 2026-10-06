@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { db } from './sql.js';
+import { deleteAccount } from '../lib/deleteAccount.js';
 
 const EXTRA_PLANS = [
   {
@@ -160,6 +161,7 @@ export async function migrateSchema() {
   await restoreSmokeTestBio();
   await backfillAdCampaignOwners();
   await grandfatherEmailVerification();
+  await purgeAnonymizedAccounts();
 }
 
 /** O alcance menor (só a cidade) passa a custar menos que o mapa inteiro. Roda uma vez. */
@@ -187,6 +189,43 @@ async function fixMapHighlightPricing() {
   );
   await db.run(
     `INSERT INTO app_settings (key, value) VALUES ('map_highlight_pricing_v1', '1')
+     ON CONFLICT (key) DO NOTHING`
+  );
+}
+
+/** Contas já anonimizadas ("Conta excluída") somem de vez, com o conteúdo delas. Roda uma vez. */
+async function purgeAnonymizedAccounts() {
+  const flag = await db.get<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = 'purge_anonymized_accounts_v1'`
+  );
+  if (flag) return;
+
+  const rows = await db.all<{ id: string }>(
+    `SELECT id FROM users
+     WHERE split_part(email, '@', 2) = 'deleted.local'
+        OR (full_name = 'Conta excluída' AND COALESCE(is_active, 0) = 0)`
+  );
+  let failed = false;
+  for (const row of rows) {
+    try {
+      await deleteAccount(row.id);
+    } catch (err) {
+      failed = true;
+      console.error('Falha ao apagar conta excluída', row.id, err);
+    }
+  }
+  if (failed) return;
+
+  await db.run(
+    `UPDATE community_groups g
+     SET members_count = (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id)`
+  );
+  await db.run(
+    `UPDATE community_events e
+     SET interest_count = (SELECT COUNT(*) FROM event_interests i WHERE i.event_id = e.id)`
+  );
+  await db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('purge_anonymized_accounts_v1', '1')
      ON CONFLICT (key) DO NOTHING`
   );
 }

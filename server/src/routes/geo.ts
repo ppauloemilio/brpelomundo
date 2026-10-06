@@ -31,11 +31,13 @@ router.get('/used-countries', authMiddleware, async (req, res) => {
         [EXCLUDED_COUNTRY]
       )
     : await db.all<{ country_code: string }>(
-        `SELECT DISTINCT UPPER(TRIM(current_country)) AS country_code
-         FROM public_profiles
-         WHERE current_country IS NOT NULL
-           AND TRIM(current_country) != ''
-           AND UPPER(TRIM(current_country)) != ?
+        `SELECT DISTINCT UPPER(TRIM(p.current_country)) AS country_code
+         FROM public_profiles p
+         JOIN users u ON u.id = p.user_id
+         WHERE COALESCE(u.is_active, 1) = 1
+           AND p.current_country IS NOT NULL
+           AND TRIM(p.current_country) != ''
+           AND UPPER(TRIM(p.current_country)) != ?
          ORDER BY country_code`,
         [EXCLUDED_COUNTRY]
       );
@@ -67,11 +69,13 @@ router.get('/used-states', authMiddleware, async (req, res) => {
         [country]
       )
     : await db.all<{ name: string }>(
-        `SELECT DISTINCT TRIM(current_state) AS name, lower(TRIM(current_state)) AS name_sort
-         FROM public_profiles
-         WHERE UPPER(TRIM(current_country)) = ?
-           AND current_state IS NOT NULL
-           AND TRIM(current_state) != ''
+        `SELECT DISTINCT TRIM(p.current_state) AS name, lower(TRIM(p.current_state)) AS name_sort
+         FROM public_profiles p
+         JOIN users u ON u.id = p.user_id
+         WHERE COALESCE(u.is_active, 1) = 1
+           AND UPPER(TRIM(p.current_country)) = ?
+           AND p.current_state IS NOT NULL
+           AND TRIM(p.current_state) != ''
          ORDER BY name_sort`,
         [country]
       );
@@ -101,12 +105,14 @@ router.get('/used-cities', authMiddleware, async (req, res) => {
         [country, state]
       )
     : await db.all<{ name: string }>(
-        `SELECT DISTINCT TRIM(current_city) AS name, lower(TRIM(current_city)) AS name_sort
-         FROM public_profiles
-         WHERE UPPER(TRIM(current_country)) = ?
-           AND TRIM(current_state) = ?
-           AND current_city IS NOT NULL
-           AND TRIM(current_city) != ''
+        `SELECT DISTINCT TRIM(p.current_city) AS name, lower(TRIM(p.current_city)) AS name_sort
+         FROM public_profiles p
+         JOIN users u ON u.id = p.user_id
+         WHERE COALESCE(u.is_active, 1) = 1
+           AND UPPER(TRIM(p.current_country)) = ?
+           AND TRIM(p.current_state) = ?
+           AND p.current_city IS NOT NULL
+           AND TRIM(p.current_city) != ''
          ORDER BY name_sort`,
         [country, state]
       );

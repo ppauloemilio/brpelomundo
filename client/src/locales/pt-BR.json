@@ -607,7 +607,7 @@
     "contentEvents": "Eventos",
     "contentGroups": "Grupos",
     "searchContent": "Buscar título ou responsável",
-    "deleteUserConfirm": "Excluir {{name}}? A conta deixa de entrar e as publicações, empresas, anúncios, eventos e grupos dessa pessoa saem do ar.",
+    "deleteUserConfirm": "Excluir {{name}}? A conta some, junto com publicações, comentários, curtidas, empresas, classificados, eventos, grupos, anúncios e mensagens.",
     "deletePostConfirm": "Excluir esta publicação e os comentários dela?",
     "deleteBusinessConfirm": "Excluir a empresa {{name}}? Ela sai do mapa e das listas.",
     "deleteAdConfirm": "Excluir o anúncio {{name}}?",

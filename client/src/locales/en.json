@@ -607,7 +607,7 @@
     "contentEvents": "Events",
     "contentGroups": "Groups",
     "searchContent": "Search title or owner",
-    "deleteUserConfirm": "Delete {{name}}? The account can no longer sign in, and their posts, businesses, listings, events and groups go offline.",
+    "deleteUserConfirm": "Delete {{name}}? The account is removed, along with their posts, comments, likes, businesses, listings, events, groups, ads and messages.",
     "deletePostConfirm": "Delete this post and its comments?",
     "deleteBusinessConfirm": "Delete {{name}}? It leaves the map and the lists.",
     "deleteAdConfirm": "Delete the ad {{name}}?",

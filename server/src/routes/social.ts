@@ -56,7 +56,7 @@ router.get('/friendships/pending', authMiddleware, async (req: AuthRequest, res)
     `SELECT f.*, u.id AS user_id, u.username, u.full_name, u.avatar_url
      FROM friendships f
      JOIN users u ON u.id = f.requester_id
-     WHERE f.receiver_id = ? AND f.status = 'pending'
+     WHERE f.receiver_id = ? AND f.status = 'pending' AND COALESCE(u.is_active, 1) = 1
      ORDER BY f.created_at DESC`,
     [req.user!.id]
   );
@@ -132,6 +132,7 @@ router.get('/friendships/user/:userId', authMiddleware, async (req: AuthRequest,
     `SELECT f.*, u.id AS friend_id, u.username, u.full_name, u.avatar_url FROM friendships f
      JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.receiver_id ELSE f.requester_id END
      WHERE (f.requester_id = ? OR f.receiver_id = ?) AND f.status = 'accepted'
+       AND COALESCE(u.is_active, 1) = 1
      ORDER BY u.full_name`,
     [userId, userId, userId]
   );
@@ -162,6 +163,7 @@ router.get('/friendships', authMiddleware, async (req: AuthRequest, res) => {
     `SELECT f.*, u.id AS friend_id, u.username, u.full_name, u.avatar_url FROM friendships f
      JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.receiver_id ELSE f.requester_id END
      WHERE (f.requester_id = ? OR f.receiver_id = ?) AND f.status = 'accepted'
+       AND COALESCE(u.is_active, 1) = 1
      ORDER BY u.full_name`,
     [req.user!.id, req.user!.id, req.user!.id]
   );

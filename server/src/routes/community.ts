@@ -31,11 +31,13 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
             SUM(people_count) AS people_count,
             SUM(business_count) AS business_count
      FROM (
-       SELECT UPPER(TRIM(current_country)) AS country_code, COUNT(*) AS people_count, 0 AS business_count
-       FROM public_profiles
-       WHERE current_country IS NOT NULL
-         AND TRIM(current_country) != ''
-         AND UPPER(TRIM(current_country)) != ?
+       SELECT UPPER(TRIM(p.current_country)) AS country_code, COUNT(*) AS people_count, 0 AS business_count
+       FROM public_profiles p
+       JOIN users u ON u.id = p.user_id
+       WHERE COALESCE(u.is_active, 1) = 1
+         AND p.current_country IS NOT NULL
+         AND TRIM(p.current_country) != ''
+         AND UPPER(TRIM(p.current_country)) != ?
        GROUP BY UPPER(TRIM(current_country))
        UNION ALL
        SELECT UPPER(TRIM(country)) AS country_code, 0 AS people_count, COUNT(*) AS business_count
@@ -83,7 +85,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
          FROM users u
          JOIN public_profiles p ON p.user_id = u.id
          LEFT JOIN follows f ON f.follower_id = ? AND f.following_id = u.id
-         WHERE UPPER(TRIM(p.current_country)) = ?
+         WHERE COALESCE(u.is_active, 1) = 1
+           AND UPPER(TRIM(p.current_country)) = ?
            AND UPPER(TRIM(p.current_country)) != ?
          ORDER BY
            CASE WHEN p.is_premium = 1 AND (p.premium_until IS NULL OR p.premium_until >= utc_now()) THEN 0 ELSE 1 END,

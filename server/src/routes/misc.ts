@@ -117,7 +117,7 @@ router.get('/explore', authMiddleware, async (req: AuthRequest, res) => {
     });
   }
 
-  const conditions = ["UPPER(TRIM(p.current_country)) != 'BR'"];
+  const conditions = ['COALESCE(u.is_active, 1) = 1', "UPPER(TRIM(p.current_country)) != 'BR'"];
   const params: string[] = [];
 
   if (country) {
@@ -181,7 +181,8 @@ router.get('/search', authMiddleware, async (req: AuthRequest, res) => {
     ),
     db.all(
       `SELECT u.id, u.full_name, u.username FROM users u
-       WHERE u.full_name ILIKE ? OR u.username ILIKE ? LIMIT 10`,
+       WHERE COALESCE(u.is_active, 1) = 1
+         AND (u.full_name ILIKE ? OR u.username ILIKE ?) LIMIT 10`,
       [`%${q}%`, `%${q}%`]
     ),
     db.all(`SELECT id, content FROM posts WHERE is_active = 1 AND content ILIKE ? LIMIT 10`, [
@@ -237,7 +238,7 @@ router.get('/feed/sidebar', authMiddleware, async (req: AuthRequest, res) => {
                   CASE WHEN LOWER(TRIM(p.current_city)) = LOWER(?) THEN 0 ELSE 1 END AS city_rank
            FROM users u
            JOIN public_profiles p ON p.user_id = u.id
-           WHERE p.current_country = ? AND u.id != ?
+           WHERE COALESCE(u.is_active, 1) = 1 AND p.current_country = ? AND u.id != ?
            ${excludeSql}
            ORDER BY city_rank ASC, u.full_name ASC
            LIMIT 10`,
@@ -247,7 +248,7 @@ router.get('/feed/sidebar', authMiddleware, async (req: AuthRequest, res) => {
           `SELECT u.id, u.username, u.full_name, u.avatar_url, p.current_country, p.current_city
            FROM users u
            JOIN public_profiles p ON p.user_id = u.id
-           WHERE p.current_country = ? AND u.id != ?
+           WHERE COALESCE(u.is_active, 1) = 1 AND p.current_country = ? AND u.id != ?
            ${excludeSql}
            ORDER BY u.full_name ASC
            LIMIT 10`,
