@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PostCard, Post } from '@/components/feed/PostCard';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { ReportButton, ReviewsSection } from '@/components/trust/ReviewsSection';
+import { ReportButton } from '@/components/trust/ReviewsSection';
 import { COUNTRY_LABELS, cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -335,14 +335,6 @@ export function ProfileView({
             )}
           </div>
       </ProfileHeader>
-
-      <div className="mt-4">
-        <Card>
-          <CardContent className="pt-5">
-            <ReviewsSection targetType="user" targetId={userId} ownerId={userId} />
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="mt-4 space-y-4">
         {tab === 'posts' && (

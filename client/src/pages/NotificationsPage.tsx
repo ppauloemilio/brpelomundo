@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
+import { UserLink } from '@/components/ui/UserLink';
 import { formatDate } from '@/lib/utils';
 
 type Notification = {
@@ -80,7 +81,9 @@ export function NotificationsPage() {
             className={!n.is_read ? 'border-brand-200 bg-brand-50/50' : ''}
           >
             <CardContent className="flex items-start gap-3 pt-4">
-              <Avatar name={n.actor_snapshot.full_name} src={n.actor_snapshot.avatar_url} className="h-10 w-10" />
+              <UserLink userId={n.actor_id} className="shrink-0 no-underline">
+                <Avatar name={n.actor_snapshot.full_name} src={n.actor_snapshot.avatar_url} className="h-10 w-10" />
+              </UserLink>
               <div className="min-w-0 flex-1">
                 <p className="text-sm">
                   {n.type === 'friendship_accepted_self' ? (
@@ -89,7 +92,9 @@ export function NotificationsPage() {
                     t('notifications.friendshipRejectedSelfMsg', { name: n.actor_snapshot.full_name })
                   ) : (
                     <>
-                      <span className="font-semibold">{n.actor_snapshot.full_name}</span>{' '}
+                      <UserLink userId={n.actor_id} className="font-semibold text-slate-900">
+                        {n.actor_snapshot.full_name}
+                      </UserLink>{' '}
                       {t(`notifications.${n.type}` as 'notifications.like')}
                     </>
                   )}

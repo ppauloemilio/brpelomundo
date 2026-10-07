@@ -226,6 +226,7 @@
     "interested": "Interessado",
     "interestedCount": "{{count}} interessados",
     "organizedBy": "Por {{name}}",
+    "organizedByLabel": "Por",
     "sponsored": "Patrocinado",
     "empty": "Nenhum evento encontrado.",
     "emptyHint": "Crie o primeiro encontro da comunidade."
@@ -771,6 +772,7 @@
     "save": "Salvar",
     "cancel": "Cancelar",
     "close": "Fechar",
+    "edit": "Editar",
     "delete": "Excluir",
     "back": "Voltar",
     "error": "Algo deu errado"

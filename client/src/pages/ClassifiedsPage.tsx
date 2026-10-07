@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
+import { UserLink } from '@/components/ui/UserLink';
 import { COUNTRY_LABELS, cn } from '@/lib/utils';
 import { ReportButton, ReviewsSection } from '@/components/trust/ReviewsSection';
 
@@ -191,17 +192,19 @@ export function ClassifiedsPage() {
             <SafetyNotice />
 
             <div className="flex items-center gap-3 rounded-xl border border-slate-100 p-3">
-              <Avatar name={selected.seller_name} src={selected.seller_avatar} className="h-10 w-10" />
+              <UserLink userId={selected.seller_id} className="shrink-0 no-underline">
+                <Avatar name={selected.seller_name} src={selected.seller_avatar} className="h-10 w-10" />
+              </UserLink>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-slate-500">{t('classifieds.seller')}</p>
-                <p className="font-medium text-slate-900">
+                <UserLink userId={selected.seller_id} className="font-medium text-slate-900">
                   {selected.seller_name}
                   {!!selected.seller_verified && (
-                    <span className="ml-2 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">
+                    <span className="ml-2 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 no-underline">
                       {t('trust.verified')}
                     </span>
                   )}
-                </p>
+                </UserLink>
               </div>
               {selected.contact_whatsapp && selected.status === 'active' && (
                 <a

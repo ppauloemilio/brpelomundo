@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Heart, MessageCircle, MessageCircleOff, Share2, MoreHorizontal, MapPin, Trash2 } from 'lucide-react';
+import {
+  Heart, MessageCircle, MessageCircleOff, Share2, MoreHorizontal, MapPin, Trash2, Pencil,
+} from 'lucide-react';
 import { api, assetUrl } from '@/lib/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Textarea } from '@/components/ui/Textarea';
+import { UserLink } from '@/components/ui/UserLink';
 import { timeAgo, COUNTRY_LABELS } from '@/lib/utils';
 import { FormattedText, findInlineImages, truncateContent } from '@/lib/formatPostText';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,11 +44,17 @@ export function PostCard({ post }: { post: Post }) {
   const [showLikes, setShowLikes] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(post.content);
   const [commentsEnabled, setCommentsEnabled] = useState(post.comments_enabled !== false);
 
   useEffect(() => {
     setCommentsEnabled(post.comments_enabled !== false);
   }, [post.id, post.comments_enabled]);
+
+  useEffect(() => {
+    if (!editing) setDraft(post.content);
+  }, [post.content, editing]);
 
   const isLong = post.content.length > COLLAPSE_LEN;
   const displayContent = expanded || !isLong
@@ -93,15 +103,32 @@ export function PostCard({ post }: { post: Post }) {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: (content: string) =>
+      api(`/posts/${post.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      setMenuOpen(false);
+      qc.invalidateQueries({ queryKey: ['posts'] });
+    },
+  });
+
   return (
     <>
       <Card className="border-slate-200/80 shadow-sm overflow-hidden">
         <CardContent className="space-y-3 pt-4">
           <div className="flex items-start gap-3">
-            <Avatar name={post.author_snapshot.full_name} src={post.author_snapshot.avatar_url} className="h-11 w-11" />
+            <UserLink userId={post.author_id} className="shrink-0 no-underline">
+              <Avatar name={post.author_snapshot.full_name} src={post.author_snapshot.avatar_url} className="h-11 w-11" />
+            </UserLink>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-[15px] leading-tight">
-                {post.author_snapshot.full_name}
+                <UserLink userId={post.author_id} className="text-slate-900">
+                  {post.author_snapshot.full_name}
+                </UserLink>
                 {!!authorPremium && (
                   <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-800">
                     {t('admin.premium')}
@@ -118,7 +145,9 @@ export function PostCard({ post }: { post: Post }) {
                   </span>
                 )}
               </p>
-              <p className="text-sm text-slate-500">@{post.author_snapshot.username}</p>
+              <UserLink userId={post.author_id} className="text-sm text-slate-500 no-underline hover:underline">
+                @{post.author_snapshot.username}
+              </UserLink>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
                 <span className="inline-flex items-center gap-0.5">
                   <MapPin className="h-3 w-3" />
@@ -134,6 +163,18 @@ export function PostCard({ post }: { post: Post }) {
               </Button>
               {menuOpen && isOwner && (
                 <div className="absolute right-0 top-10 z-10 min-w-[200px] rounded-lg border bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      setDraft(post.content);
+                      setEditing(true);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    {t('common.edit')}
+                  </button>
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -159,14 +200,45 @@ export function PostCard({ post }: { post: Post }) {
             </div>
           </div>
 
-          <div className="text-[15px] leading-relaxed">
-            <FormattedText text={displayContent} />
-            {isLong && !expanded && (
-              <button type="button" className="ml-1 font-medium text-brand-700 hover:underline" onClick={() => setExpanded(true)}>
-                {t('feed.seeMore')}
-              </button>
-            )}
-          </div>
+          {editing ? (
+            <div className="space-y-2">
+              <Textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                className="min-h-[100px] rounded-xl"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-full"
+                  disabled={!draft.trim() || editMutation.isPending}
+                  onClick={() => editMutation.mutate(draft.trim())}
+                >
+                  {t('common.save')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="rounded-full"
+                  onClick={() => {
+                    setEditing(false);
+                    setDraft(post.content);
+                  }}
+                >
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-[15px] leading-relaxed">
+              <FormattedText text={displayContent} />
+              {isLong && !expanded && (
+                <button type="button" className="ml-1 font-medium text-brand-700 hover:underline" onClick={() => setExpanded(true)}>
+                  {t('feed.seeMore')}
+                </button>
+              )}
+            </div>
+          )}
 
           {galleryImages.length > 0 && (
             <div className="overflow-hidden rounded-xl border border-slate-100">

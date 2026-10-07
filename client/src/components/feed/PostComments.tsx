@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageCircleOff, Trash2 } from 'lucide-react';
+import { MessageCircleOff, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
+import { UserLink } from '@/components/ui/UserLink';
 import { timeAgo } from '@/lib/utils';
 
 export type PostComment = {
@@ -48,6 +49,8 @@ export function PostComments({ postId, postAuthorId, commentsEnabled, currentUse
   const qc = useQueryClient();
   const [comment, setComment] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
 
   const { data: comments = [] } = useQuery({
     queryKey: ['comments', postId],
@@ -82,40 +85,107 @@ export function PostComments({ postId, postAuthorId, commentsEnabled, currentUse
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: ({ commentId, content }: { commentId: string; content: string }) =>
+      api(`/posts/${postId}/comments/${commentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditDraft('');
+      qc.invalidateQueries({ queryKey: ['comments', postId] });
+    },
+  });
+
   const canDelete = (authorId: string) =>
     currentUserId === postAuthorId || currentUserId === authorId;
+  const canEdit = (authorId: string) => currentUserId === authorId;
+
+  const startEdit = (c: CommentNode) => {
+    setEditingId(c.id);
+    setEditDraft(c.content);
+    setReplyTo(null);
+  };
 
   const renderComment = (c: CommentNode, depth = 0) => (
     <div key={c.id} className={depth > 0 ? 'ml-6 mt-2 border-l-2 border-slate-100 pl-3' : ''}>
       <div className="flex gap-2">
-        <Avatar name={c.author_snapshot.full_name} src={c.author_snapshot.avatar_url} className="h-8 w-8 shrink-0" />
+        <UserLink userId={c.author_id} className="shrink-0 no-underline">
+          <Avatar name={c.author_snapshot.full_name} src={c.author_snapshot.avatar_url} className="h-8 w-8" />
+        </UserLink>
         <div className="min-w-0 flex-1">
           <div className="rounded-xl bg-slate-50 px-3 py-2">
-            <p className="text-sm font-medium text-slate-900">{c.author_snapshot.full_name}</p>
-            <p className="text-sm text-slate-700">{c.content}</p>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-            <span>{timeAgo(c.created_at, i18n.language)}</span>
-            {commentsEnabled && (
-              <button
-                type="button"
-                className="font-medium hover:text-brand-700"
-                onClick={() => setReplyTo({ id: c.id, name: c.author_snapshot.full_name })}
-              >
-                {t('feed.reply')}
-              </button>
+            <UserLink userId={c.author_id} className="text-sm font-medium text-slate-900">
+              {c.author_snapshot.full_name}
+            </UserLink>
+            {editingId === c.id ? (
+              <div className="mt-2 space-y-2">
+                <Textarea
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  className="min-h-[60px] rounded-xl bg-white"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="rounded-full"
+                    disabled={!editDraft.trim() || editMutation.isPending}
+                    onClick={() => editMutation.mutate({ commentId: c.id, content: editDraft.trim() })}
+                  >
+                    {t('common.save')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-full"
+                    onClick={() => {
+                      setEditingId(null);
+                      setEditDraft('');
+                    }}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-700">{c.content}</p>
             )}
-            {canDelete(c.author_id) && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-0.5 font-medium text-red-600 hover:text-red-700"
-                onClick={() => deleteMutation.mutate(c.id)}
-              >
-                <Trash2 className="h-3 w-3" />
-                {t('common.delete')}
-              </button>
-            )}
           </div>
+          {editingId !== c.id && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span>{timeAgo(c.created_at, i18n.language)}</span>
+              {commentsEnabled && (
+                <button
+                  type="button"
+                  className="font-medium hover:text-brand-700"
+                  onClick={() => setReplyTo({ id: c.id, name: c.author_snapshot.full_name })}
+                >
+                  {t('feed.reply')}
+                </button>
+              )}
+              {canEdit(c.author_id) && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-0.5 font-medium hover:text-brand-700"
+                  onClick={() => startEdit(c)}
+                >
+                  <Pencil className="h-3 w-3" />
+                  {t('common.edit')}
+                </button>
+              )}
+              {canDelete(c.author_id) && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-0.5 font-medium text-red-600 hover:text-red-700"
+                  onClick={() => deleteMutation.mutate(c.id)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  {t('common.delete')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {c.replies.map((r) => renderComment(r, depth + 1))}

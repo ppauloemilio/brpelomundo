@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Avatar } from '@/components/ui/Avatar';
+import { UserLink } from '@/components/ui/UserLink';
 
 type LikeUser = {
   user_id: string;
@@ -41,7 +42,11 @@ export function PostLikesDialog({ postId, onClose }: Props) {
             <p className="px-4 py-8 text-center text-sm text-slate-500">{t('feed.noLikes')}</p>
           ) : (
             likes.map((like) => (
-              <div key={like.user_id} className="flex items-center gap-3 px-4 py-3">
+              <UserLink
+                key={like.user_id}
+                userId={like.user_id}
+                className="flex items-center gap-3 px-4 py-3 no-underline hover:bg-slate-50"
+              >
                 <Avatar
                   name={like.user_snapshot.full_name}
                   src={like.user_snapshot.avatar_url}
@@ -53,7 +58,7 @@ export function PostLikesDialog({ postId, onClose }: Props) {
                     <p className="truncate text-sm text-slate-500">@{like.user_snapshot.username}</p>
                   )}
                 </div>
-              </div>
+              </UserLink>
             ))
           )}
         </div>

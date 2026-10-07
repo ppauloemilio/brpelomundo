@@ -226,6 +226,7 @@
     "interested": "Interested",
     "interestedCount": "{{count}} interested",
     "organizedBy": "By {{name}}",
+    "organizedByLabel": "By",
     "sponsored": "Sponsored",
     "empty": "No events found.",
     "emptyHint": "Create the first community meetup."
@@ -771,6 +772,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
+    "edit": "Edit",
     "delete": "Delete",
     "back": "Back",
     "error": "Something went wrong"

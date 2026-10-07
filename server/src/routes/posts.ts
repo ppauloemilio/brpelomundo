@@ -196,20 +196,30 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
 
 router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const { comments_enabled } = req.body as { comments_enabled?: boolean };
+  const { comments_enabled, content } = req.body as {
+    comments_enabled?: boolean;
+    content?: string;
+  };
   const post = await db.get<{ author_id: string }>(
     'SELECT * FROM posts WHERE id = ? AND is_active = 1',
     [id]
   );
   if (!post) return res.status(404).json({ error: 'Post não encontrado' });
   if (post.author_id !== req.user!.id) return res.status(403).json({ error: 'Sem permissão' });
-  if (comments_enabled === undefined) {
+  if (comments_enabled === undefined && content === undefined) {
     return res.status(400).json({ error: 'Nada para atualizar' });
   }
-  await db.run('UPDATE posts SET comments_enabled = ? WHERE id = ?', [
-    comments_enabled ? 1 : 0,
-    id,
-  ]);
+  if (content !== undefined) {
+    const trimmed = typeof content === 'string' ? content.trim() : '';
+    if (!trimmed) return res.status(400).json({ error: 'Conteúdo vazio' });
+    await db.run('UPDATE posts SET content = ? WHERE id = ?', [trimmed, id]);
+  }
+  if (comments_enabled !== undefined) {
+    await db.run('UPDATE posts SET comments_enabled = ? WHERE id = ?', [
+      comments_enabled ? 1 : 0,
+      id,
+    ]);
+  }
   const [updated, settings] = await Promise.all([
     db.get('SELECT * FROM posts WHERE id = ?', [id]),
     getMonetizationSettings(),
@@ -349,6 +359,35 @@ router.post('/:id/comments', authMiddleware, async (req: AuthRequest, res) => {
   res.status(201).json({
     ...comment,
     author_snapshot: parseJson(comment!.author_snapshot, {}),
+  });
+});
+
+router.patch('/:postId/comments/:commentId', authMiddleware, async (req: AuthRequest, res) => {
+  const postId = paramId(req.params.postId);
+  const commentId = paramId(req.params.commentId);
+  const { content } = req.body as { content?: string };
+  const trimmed = typeof content === 'string' ? content.trim() : '';
+  if (!trimmed) return res.status(400).json({ error: 'Comentário vazio' });
+
+  const comment = await db.get<{ id: string; author_id: string; post_id: string }>(
+    'SELECT * FROM comments WHERE id = ? AND is_active = 1',
+    [commentId]
+  );
+  if (!comment || comment.post_id !== postId) {
+    return res.status(404).json({ error: 'Comentário não encontrado' });
+  }
+  if (comment.author_id !== req.user!.id) {
+    return res.status(403).json({ error: 'Sem permissão' });
+  }
+
+  await db.run('UPDATE comments SET content = ? WHERE id = ?', [trimmed, commentId]);
+  const updated = await db.get<{ author_snapshot: string }>(
+    'SELECT * FROM comments WHERE id = ?',
+    [commentId]
+  );
+  res.json({
+    ...updated,
+    author_snapshot: parseJson(updated!.author_snapshot, {}),
   });
 });
 

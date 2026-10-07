@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Avatar } from '@/components/ui/Avatar';
+import { UserLink } from '@/components/ui/UserLink';
 import { cn } from '@/lib/utils';
 
 type Review = {
@@ -139,10 +140,14 @@ export function ReviewsSection({ targetType, targetId, ownerId, compact }: Props
           {data!.reviews.map((r) => (
             <li key={r.id} className="rounded-xl border border-slate-100 p-3">
               <div className="flex items-start gap-2">
-                <Avatar name={r.author_name} src={r.author_avatar} className="h-8 w-8" />
+                <UserLink userId={r.author_id} className="shrink-0 no-underline">
+                  <Avatar name={r.author_name} src={r.author_avatar} className="h-8 w-8" />
+                </UserLink>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{r.author_name}</span>
+                    <UserLink userId={r.author_id} className="text-sm font-medium text-slate-900">
+                      {r.author_name}
+                    </UserLink>
                     <Stars value={r.rating} size="sm" />
                   </div>
                   {r.comment && <p className="mt-1 text-sm text-slate-600">{r.comment}</p>}

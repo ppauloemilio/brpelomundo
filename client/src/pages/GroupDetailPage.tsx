@@ -8,6 +8,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent } from '@/components/ui/Card';
+import { UserLink } from '@/components/ui/UserLink';
 import { COUNTRY_LABELS } from '@/lib/utils';
 
 type GroupDetail = {
@@ -25,6 +26,7 @@ type GroupDetail = {
 
 type GroupPost = {
   id: string;
+  author_id: string;
   content: string;
   created_at: string;
   author_snapshot: { full_name: string; username: string; avatar_url?: string };
@@ -134,9 +136,13 @@ export function GroupDetailPage() {
             posts.map((p) => (
               <Card key={p.id}>
                 <CardContent className="flex gap-3 pt-4">
-                  <Avatar name={p.author_snapshot.full_name} src={p.author_snapshot.avatar_url} className="h-10 w-10" />
+                  <UserLink userId={p.author_id} className="shrink-0 no-underline">
+                    <Avatar name={p.author_snapshot.full_name} src={p.author_snapshot.avatar_url} className="h-10 w-10" />
+                  </UserLink>
                   <div>
-                    <p className="font-medium text-slate-900">{p.author_snapshot.full_name}</p>
+                    <UserLink userId={p.author_id} className="font-medium text-slate-900">
+                      {p.author_snapshot.full_name}
+                    </UserLink>
                     <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{p.content}</p>
                   </div>
                 </CardContent>

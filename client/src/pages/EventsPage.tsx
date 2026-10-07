@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent } from '@/components/ui/Card';
+import { UserLink } from '@/components/ui/UserLink';
 import { COUNTRY_LABELS } from '@/lib/utils';
 
 type CommunityEvent = {
@@ -23,6 +24,7 @@ type CommunityEvent = {
   interest_count: number;
   interested_by_me: boolean;
   is_sponsored?: boolean;
+  organizer_id: string;
   organizer_name: string;
   whatsapp?: string;
   external_link?: string;
@@ -165,7 +167,10 @@ export function EventsPage() {
                   </p>
                   {ev.description && <p className="mt-2 line-clamp-3 text-sm text-slate-600">{ev.description}</p>}
                   <p className="mt-2 text-xs text-slate-500">
-                    {t('events.organizedBy', { name: ev.organizer_name })}
+                    {t('events.organizedByLabel')}{' '}
+                    <UserLink userId={ev.organizer_id} className="font-medium text-slate-700">
+                      {ev.organizer_name}
+                    </UserLink>
                     {' · '}
                     <span className="inline-flex items-center gap-1">
                       <Users className="h-3 w-3" />

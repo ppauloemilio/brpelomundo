@@ -8,6 +8,7 @@ import {
 import { api, uploadFile } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
+import { UserLink } from '@/components/ui/UserLink';
 import { ForwardDialog } from '@/components/messages/ForwardDialog';
 import { EmojiPicker } from '@/components/messages/EmojiPicker';
 import { MessageAttachment } from '@/components/messages/MessageAttachment';
@@ -288,16 +289,26 @@ export function MessagesPage() {
         {activeId && active ? (
           <>
             <header className="flex items-center gap-3 border-b bg-[#f0f2f5] px-4 py-2">
-              <Avatar
-                name={active.other_user?.full_name || '?'}
-                src={active.other_user?.avatar_url}
-                className="h-10 w-10"
-              />
+              <UserLink userId={active.other_user?.id} className="shrink-0 no-underline">
+                <Avatar
+                  name={active.other_user?.full_name || '?'}
+                  src={active.other_user?.avatar_url}
+                  className="h-10 w-10"
+                />
+              </UserLink>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-slate-900">
+                <UserLink
+                  userId={active.other_user?.id}
+                  className="block truncate font-semibold text-slate-900"
+                >
                   {active.other_user?.full_name}
-                </p>
-                <p className="truncate text-xs text-slate-500">@{active.other_user?.username}</p>
+                </UserLink>
+                <UserLink
+                  userId={active.other_user?.id}
+                  className="block truncate text-xs text-slate-500 no-underline hover:underline"
+                >
+                  @{active.other_user?.username}
+                </UserLink>
               </div>
               <button type="button" className="rounded-full p-2 text-slate-500 hover:bg-slate-200/60">
                 <Search className="h-5 w-5" />
