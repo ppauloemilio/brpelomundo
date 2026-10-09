@@ -95,9 +95,11 @@ export function ExploreGeoFilters({ tab, filters, onChange, className }: Props) 
 }
 
 export function useCountryNameMap() {
+  const { i18n } = useTranslation();
+  const countryLocale = i18n.language.startsWith('pt') ? 'pt-BR' : 'en';
   const { data: countries = [] } = useQuery({
-    queryKey: ['geo-countries'],
-    queryFn: () => api<GeoItem[]>('/geo/countries'),
+    queryKey: ['geo-countries', countryLocale],
+    queryFn: () => api<GeoItem[]>(`/geo/countries?locale=${countryLocale}`),
   });
   return Object.fromEntries(countries.map((c) => [c.code, c.name]));
 }

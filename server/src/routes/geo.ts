@@ -7,8 +7,23 @@ const router = Router();
 const OUTROS = 'OUTROS';
 const EXCLUDED_COUNTRY = 'BR';
 
-function countryName(code: string): string {
+function countryListLocale(raw: unknown): string {
+  const s = String(raw || 'pt-BR').toLowerCase();
+  return s.startsWith('en') ? 'en' : 'pt-BR';
+}
+
+function localizedCountryName(code: string, locale: string): string {
+  try {
+    const label = new Intl.DisplayNames([locale], { type: 'region' }).of(code);
+    if (label) return label;
+  } catch {
+    /* runtime sem Intl.DisplayNames */
+  }
   return Country.getCountryByCode(code)?.name || code;
+}
+
+function countryName(code: string): string {
+  return localizedCountryName(code, 'pt-BR');
 }
 
 function exploreType(req: { query: Record<string, unknown> }): 'people' | 'businesses' {
@@ -138,11 +153,12 @@ router.get('/used-categories', authMiddleware, async (req, res) => {
   res.json(rows.map((r) => ({ code: r.code, name: r.code })));
 });
 
-/** Lista completa ISO — público (cadastro, perfil). */
-router.get('/countries', (_req, res) => {
+/** Lista completa ISO — público (cadastro, perfil). Nomes em pt-BR por padrão. */
+router.get('/countries', (req, res) => {
+  const locale = countryListLocale(req.query.locale);
   const countries = Country.getAllCountries()
-    .map((c) => ({ code: c.isoCode, name: c.name }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    .map((c) => ({ code: c.isoCode, name: localizedCountryName(c.isoCode, locale) }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale));
   res.json(countries);
 });
 

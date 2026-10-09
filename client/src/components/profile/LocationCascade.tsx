@@ -55,12 +55,13 @@ export function LocationCascade({
   fixedCountry,
   showCountry = true,
 }: LocationCascadeProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const countryLocale = i18n.language.startsWith('pt') ? 'pt-BR' : 'en';
   const effectiveCountry = fixedCountry || country;
 
   const { data: countries = [] } = useQuery({
-    queryKey: ['geo-countries'],
-    queryFn: () => api<GeoItem[]>('/geo/countries'),
+    queryKey: ['geo-countries', countryLocale],
+    queryFn: () => api<GeoItem[]>(`/geo/countries?locale=${countryLocale}`),
     enabled: showCountry && !fixedCountry,
   });
 

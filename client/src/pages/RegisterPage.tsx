@@ -24,14 +24,14 @@ export function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const { data: countries = [] } = useQuery({
-    queryKey: ['geo-countries'],
-    queryFn: () => api<Array<{ code: string; name: string }>>('/geo/countries'),
+    queryKey: ['geo-countries', 'pt-BR'],
+    queryFn: () => api<Array<{ code: string; name: string }>>('/geo/countries?locale=pt-BR'),
   });
 
-  const sortedCountries = useMemo(() => {
-    const locale = i18nInstance.language.startsWith('pt') ? 'pt-BR' : 'en';
-    return [...countries].sort((a, b) => a.name.localeCompare(b.name, locale));
-  }, [countries, i18nInstance.language]);
+  const sortedCountries = useMemo(
+    () => [...countries].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [countries]
+  );
 
   const changeLang = (lang: string) => {
     i18n.changeLanguage(lang);
