@@ -138,7 +138,8 @@ router.get('/used-categories', authMiddleware, async (req, res) => {
   res.json(rows.map((r) => ({ code: r.code, name: r.code })));
 });
 
-router.get('/countries', authMiddleware, (_req, res) => {
+/** Lista completa ISO — público (cadastro, perfil). */
+router.get('/countries', (_req, res) => {
   const countries = Country.getAllCountries()
     .map((c) => ({ code: c.isoCode, name: c.name }))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));

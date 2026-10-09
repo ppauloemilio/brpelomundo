@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import i18n from '@/i18n';
 import { api } from '@/lib/api';
@@ -21,6 +22,16 @@ export function RegisterPage() {
   const [resent, setResent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const { data: countries = [] } = useQuery({
+    queryKey: ['geo-countries'],
+    queryFn: () => api<Array<{ code: string; name: string }>>('/geo/countries'),
+  });
+
+  const sortedCountries = useMemo(() => {
+    const locale = i18nInstance.language.startsWith('pt') ? 'pt-BR' : 'en';
+    return [...countries].sort((a, b) => a.name.localeCompare(b.name, locale));
+  }, [countries, i18nInstance.language]);
 
   const changeLang = (lang: string) => {
     i18n.changeLanguage(lang);
@@ -123,13 +134,17 @@ export function RegisterPage() {
                 className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 value={form.country}
                 onChange={(e) => setForm({ ...form, country: e.target.value })}
+                required
               >
-                <option value="BR">Brasil</option>
-                <option value="US">Estados Unidos</option>
-                <option value="PT">Portugal</option>
-                <option value="CA">Canadá</option>
-                <option value="UK">Reino Unido</option>
-                <option value="DE">Alemanha</option>
+                {sortedCountries.length === 0 ? (
+                  <option value="US">{t('common.loading')}</option>
+                ) : (
+                  sortedCountries.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
