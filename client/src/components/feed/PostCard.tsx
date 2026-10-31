@@ -119,7 +119,7 @@ export function PostCard({ post }: { post: Post }) {
 
   return (
     <>
-      <Card className="border-slate-200/80 shadow-sm overflow-hidden">
+      <Card className="relative z-0 border-slate-200/80 shadow-sm overflow-visible">
         <CardContent className="space-y-3 pt-4">
           <div className="flex items-start gap-3">
             <UserLink userId={post.author_id} className="shrink-0 no-underline">
@@ -158,14 +158,14 @@ export function PostCard({ post }: { post: Post }) {
                 <span>{timeAgo(post.created_at, i18n.language)}</span>
               </div>
             </div>
-            <div className="relative flex flex-col items-end gap-1">
+            <div className="relative z-20 flex flex-col items-end gap-1">
               {(isOwner || user) && (
                 <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setMenuOpen(!menuOpen)}>
                   <MoreHorizontal className="h-5 w-5 text-slate-400" />
                 </Button>
               )}
               {menuOpen && (
-                <div className="absolute right-0 top-10 z-10 min-w-[200px] rounded-lg border bg-white py-1 shadow-lg">
+                <div className="absolute right-0 top-10 z-30 min-w-[200px] rounded-lg border bg-white py-1 shadow-lg">
                   {isOwner ? (
                     <>
                       <button

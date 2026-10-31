@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 import { AcceptTermsGate } from '@/components/legal/AcceptTermsGate';
+import { LegalFooter } from '@/components/legal/LegalFooter';
 
 const mainNav = [
   { to: '/feed', icon: Home, labelKey: 'nav.feed' },
@@ -131,9 +132,21 @@ export function Layout() {
         </div>
       </header>
 
-      <div className={cn('mx-auto max-w-6xl px-4 py-4 lg:px-6', isFeed ? '' : 'pb-20 md:pb-6')}>
+      <div className={cn('mx-auto max-w-6xl px-4 py-4 lg:px-6', isFeed ? '' : 'pb-6')}>
         <Outlet />
       </div>
+
+      <footer className={cn(
+        'border-t border-slate-200 bg-white',
+        'pb-20 md:pb-0'
+      )}>
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-4 py-5 text-center lg:px-6 sm:flex-row sm:justify-between sm:text-left">
+          <p className="text-xs text-slate-500">
+            {t('app.name')} · {t('settings.legalHint')}
+          </p>
+          <LegalFooter className="justify-center sm:justify-end" />
+        </div>
+      </footer>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-slate-200 bg-white md:hidden">
         {mainNav.map(({ to, icon: Icon, labelKey }) => (
