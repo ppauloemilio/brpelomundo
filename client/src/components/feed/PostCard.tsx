@@ -15,6 +15,7 @@ import { FormattedText, findInlineImages, truncateContent } from '@/lib/formatPo
 import { useAuth } from '@/hooks/useAuth';
 import { PostLikesDialog } from '@/components/feed/PostLikesDialog';
 import { PostComments } from '@/components/feed/PostComments';
+import { ReportButton } from '@/components/trust/ReviewsSection';
 
 export type Post = {
   id: string;
@@ -157,44 +158,54 @@ export function PostCard({ post }: { post: Post }) {
                 <span>{timeAgo(post.created_at, i18n.language)}</span>
               </div>
             </div>
-            <div className="relative">
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setMenuOpen(!menuOpen)}>
-                <MoreHorizontal className="h-5 w-5 text-slate-400" />
-              </Button>
-              {menuOpen && isOwner && (
+            <div className="relative flex flex-col items-end gap-1">
+              {(isOwner || user) && (
+                <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setMenuOpen(!menuOpen)}>
+                  <MoreHorizontal className="h-5 w-5 text-slate-400" />
+                </Button>
+              )}
+              {menuOpen && (
                 <div className="absolute right-0 top-10 z-10 min-w-[200px] rounded-lg border bg-white py-1 shadow-lg">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => {
-                      setDraft(post.content);
-                      setEditing(true);
-                      setMenuOpen(false);
-                    }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                    {t('common.edit')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => toggleCommentsMutation.mutate(!commentsEnabled)}
-                  >
-                    {commentsEnabled ? (
-                      <MessageCircleOff className="h-4 w-4" />
-                    ) : (
-                      <MessageCircle className="h-4 w-4" />
-                    )}
-                    {commentsEnabled ? t('feed.disableComments') : t('feed.enableComments')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                    onClick={() => { deleteMutation.mutate(); setMenuOpen(false); }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    {t('common.delete')}
-                  </button>
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => {
+                          setDraft(post.content);
+                          setEditing(true);
+                          setMenuOpen(false);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        {t('common.edit')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        onClick={() => toggleCommentsMutation.mutate(!commentsEnabled)}
+                      >
+                        {commentsEnabled ? (
+                          <MessageCircleOff className="h-4 w-4" />
+                        ) : (
+                          <MessageCircle className="h-4 w-4" />
+                        )}
+                        {commentsEnabled ? t('feed.disableComments') : t('feed.enableComments')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        onClick={() => { deleteMutation.mutate(); setMenuOpen(false); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {t('common.delete')}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="px-3 py-2">
+                      <ReportButton targetType="post" targetId={post.id} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { UserLink } from '@/components/ui/UserLink';
+import { ReportButton } from '@/components/trust/ReviewsSection';
 import { timeAgo } from '@/lib/utils';
 
 export type PostComment = {
@@ -183,6 +184,9 @@ export function PostComments({ postId, postAuthorId, commentsEnabled, currentUse
                   <Trash2 className="h-3 w-3" />
                   {t('common.delete')}
                 </button>
+              )}
+              {currentUserId && currentUserId !== c.author_id && (
+                <ReportButton targetType="comment" targetId={c.id} />
               )}
             </div>
           )}

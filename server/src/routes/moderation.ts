@@ -6,7 +6,17 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 const router = Router();
 
 const REPORT_REASONS = ['spam', 'scam', 'offensive', 'fake_profile', 'fraud', 'other'] as const;
-const TARGET_TYPES = ['user', 'post', 'business', 'classified', 'group', 'event', 'review'] as const;
+const TARGET_TYPES = [
+  'user',
+  'post',
+  'comment',
+  'business',
+  'classified',
+  'group',
+  'group_post',
+  'event',
+  'review',
+] as const;
 
 function paramId(raw: string | string[]): string {
   return Array.isArray(raw) ? raw[0] : raw;

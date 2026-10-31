@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent } from '@/components/ui/Card';
 import { UserLink } from '@/components/ui/UserLink';
+import { ReportButton } from '@/components/trust/ReviewsSection';
+import { useAuth } from '@/hooks/useAuth';
 import { COUNTRY_LABELS } from '@/lib/utils';
 
 type GroupDetail = {
@@ -35,6 +37,7 @@ type GroupPost = {
 export function GroupDetailPage() {
   const { id = '' } = useParams();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [content, setContent] = useState('');
@@ -96,13 +99,18 @@ export function GroupDetailPage() {
                 {group.city}, {COUNTRY_LABELS[group.country] || group.country}
               </p>
             </div>
-            {group.is_member ? (
-              group.my_role !== 'owner' && (
-                <Button size="sm" variant="outline" onClick={() => leave.mutate()}>{t('groups.leave')}</Button>
-              )
-            ) : (
-              <Button size="sm" onClick={() => join.mutate()}>{t('groups.join')}</Button>
-            )}
+            <div className="flex flex-col items-end gap-2">
+              {group.is_member ? (
+                group.my_role !== 'owner' && (
+                  <Button size="sm" variant="outline" onClick={() => leave.mutate()}>{t('groups.leave')}</Button>
+                )
+              ) : (
+                <Button size="sm" onClick={() => join.mutate()}>{t('groups.join')}</Button>
+              )}
+              {group.my_role !== 'owner' && (
+                <ReportButton targetType="group" targetId={id} />
+              )}
+            </div>
           </div>
           {group.description && <p className="text-slate-600">{group.description}</p>}
           <p className="inline-flex items-center gap-1 text-sm text-slate-500">
@@ -139,10 +147,15 @@ export function GroupDetailPage() {
                   <UserLink userId={p.author_id} className="shrink-0 no-underline">
                     <Avatar name={p.author_snapshot.full_name} src={p.author_snapshot.avatar_url} className="h-10 w-10" />
                   </UserLink>
-                  <div>
-                    <UserLink userId={p.author_id} className="font-medium text-slate-900">
-                      {p.author_snapshot.full_name}
-                    </UserLink>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <UserLink userId={p.author_id} className="font-medium text-slate-900">
+                        {p.author_snapshot.full_name}
+                      </UserLink>
+                      {user?.id !== p.author_id && (
+                        <ReportButton targetType="group_post" targetId={p.id} />
+                      )}
+                    </div>
                     <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{p.content}</p>
                   </div>
                 </CardContent>

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent } from '@/components/ui/Card';
 import { UserLink } from '@/components/ui/UserLink';
+import { ReportButton } from '@/components/trust/ReviewsSection';
 import { COUNTRY_LABELS } from '@/lib/utils';
 
 type CommunityEvent = {
@@ -188,14 +189,19 @@ export function EventsPage() {
                     </a>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  variant={ev.interested_by_me ? 'outline' : 'default'}
-                  className="shrink-0 rounded-full"
-                  onClick={() => toggleInterest.mutate({ id: ev.id, interested: ev.interested_by_me })}
-                >
-                  {ev.interested_by_me ? t('events.interested') : t('events.imInterested')}
-                </Button>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <Button
+                    size="sm"
+                    variant={ev.interested_by_me ? 'outline' : 'default'}
+                    className="rounded-full"
+                    onClick={() => toggleInterest.mutate({ id: ev.id, interested: ev.interested_by_me })}
+                  >
+                    {ev.interested_by_me ? t('events.interested') : t('events.imInterested')}
+                  </Button>
+                  {user?.id !== ev.organizer_id && (
+                    <ReportButton targetType="event" targetId={ev.id} />
+                  )}
+                </div>
               </div>
             </article>
           ))}
