@@ -55,9 +55,9 @@ export function Layout() {
     <div className="min-h-screen bg-[#f8f9fa]">
       <AcceptTermsGate />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 lg:px-6">
+        <div className="mx-auto flex h-12 max-w-6xl items-center gap-4 px-4 lg:px-6">
           <button type="button" className="lg:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
-            <Menu className="h-6 w-6 text-slate-700" />
+            <Menu className="h-5 w-5 text-slate-700" />
           </button>
 
           <button
@@ -66,41 +66,41 @@ export function Layout() {
             onClick={() => navigate('/home')}
           >
             <AppLogo size="sm" src="/logo-bg.png" />
-            <span className="hidden sm:inline text-base">{t('app.name')}</span>
+            <span className="hidden text-sm sm:inline">{t('app.name')}</span>
           </button>
 
-          <nav className="mx-auto hidden items-center gap-1 md:flex">
+          <nav className="mx-auto hidden items-center gap-0.5 md:flex">
             {[...mainNav, ...moreNav].map(({ to, icon: Icon, labelKey }) => (
               <NavLink
                 key={to}
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                    'flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors',
                     isActive
                       ? 'bg-brand-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100'
                   )
                 }
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-3.5 w-3.5" />
                 {t(labelKey)}
               </NavLink>
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <Button size="sm" variant="outline" className="hidden rounded-full border-slate-300 sm:inline-flex" onClick={() => navigate('/create-post')}>
-              <Plus className="h-4 w-4" />
+          <div className="ml-auto flex items-center gap-0.5 sm:gap-1">
+            <Button size="sm" variant="outline" className="hidden h-8 rounded-full border-slate-300 px-2.5 text-xs sm:inline-flex" onClick={() => navigate('/create-post')}>
+              <Plus className="h-3.5 w-3.5" />
               {t('nav.post')}
             </Button>
             <button
               type="button"
               onClick={() => navigate('/messages')}
-              className="relative rounded-full p-2.5 text-slate-600 hover:bg-slate-100"
+              className="relative rounded-full p-2 text-slate-600 hover:bg-slate-100"
               aria-label={t('nav.messages')}
             >
-              <MessageCircle className="h-5 w-5" />
+              <MessageCircle className="h-4 w-4" />
               {(msgCount?.count ?? 0) > 0 && (
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
               )}
@@ -108,25 +108,25 @@ export function Layout() {
             <button
               type="button"
               onClick={() => navigate('/notifications')}
-              className="relative rounded-full p-2.5 text-slate-600 hover:bg-slate-100"
+              className="relative rounded-full p-2 text-slate-600 hover:bg-slate-100"
               aria-label={t('nav.notifications')}
             >
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4" />
               {(notifCount?.count ?? 0) > 0 && (
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
               )}
             </button>
             <button type="button" onClick={() => navigate('/profile')} className={cn('rounded-full ring-2 ring-transparent hover:ring-brand-200', user?.is_premium && 'ring-brand-300')}>
-              <Avatar src={user?.avatar_url} name={user?.full_name || 'U'} className="h-9 w-9" />
+              <Avatar src={user?.avatar_url} name={user?.full_name || 'U'} className="h-8 w-8" />
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-full p-2.5 text-slate-600 hover:bg-slate-100 hover:text-red-600"
+              className="rounded-full p-2 text-slate-600 hover:bg-slate-100 hover:text-red-600"
               aria-label={t('nav.logout')}
               title={t('nav.logout')}
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
