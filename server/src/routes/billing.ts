@@ -3,7 +3,10 @@ import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { authMiddleware, AuthRequest, optionalAuth } from '../middleware/auth.js';
 import {
+  capturePaypalCheckout,
   checkoutPlan,
+  createPaypalCheckout,
+  getPaymentConfig,
   listPlans,
   listUserAdCampaigns,
   updateAdCampaignCreative,
@@ -11,6 +14,10 @@ import {
 import { paramId } from '../lib/params.js';
 
 const router = Router();
+
+router.get('/payment-config', authMiddleware, async (_req, res) => {
+  res.json(getPaymentConfig());
+});
 
 router.get('/plans', authMiddleware, async (_req, res) => {
   res.json(await listPlans());
@@ -60,42 +67,48 @@ function parseAdCreative(raw: unknown) {
   };
 }
 
-router.post('/checkout', authMiddleware, async (req: AuthRequest, res) => {
-  const {
-    plan_code,
-    target_id,
-    card_last4,
-    promo_code,
-    ad_creative,
-    ad_creative_feed,
-    ad_creative_sidebar,
-    ad_creatives,
-  } = req.body;
-  if (!plan_code?.trim()) return res.status(400).json({ error: 'plan_code é obrigatório' });
-
+function parseCheckoutBody(body: Record<string, unknown>) {
+  const plan_code = typeof body.plan_code === 'string' ? body.plan_code.trim() : '';
+  const target_id = typeof body.target_id === 'string' ? body.target_id : undefined;
+  const card_last4 = typeof body.card_last4 === 'string' ? body.card_last4 : undefined;
+  const promo_code = typeof body.promo_code === 'string' ? body.promo_code : undefined;
+  const ad_creative = parseAdCreative(body.ad_creative);
   const creativesRaw =
-    ad_creatives && typeof ad_creatives === 'object' ? (ad_creatives as Record<string, unknown>) : {};
+    body.ad_creatives && typeof body.ad_creatives === 'object'
+      ? (body.ad_creatives as Record<string, unknown>)
+      : {};
   const adCreatives = {
-    feed: parseAdCreative(ad_creative_feed ?? creativesRaw.feed),
-    sidebar: parseAdCreative(ad_creative_sidebar ?? creativesRaw.sidebar),
+    feed: parseAdCreative(body.ad_creative_feed ?? creativesRaw.feed),
+    sidebar: parseAdCreative(body.ad_creative_sidebar ?? creativesRaw.sidebar),
   };
-  const hasCreatives = adCreatives.feed || adCreatives.sidebar;
+  const hasCreatives = !!(adCreatives.feed || adCreatives.sidebar);
+
+  return {
+    planCode: plan_code,
+    targetId: target_id || undefined,
+    cardLast4: card_last4,
+    promoCode: promo_code || undefined,
+    adCreative: ad_creative,
+    adCreatives: hasCreatives
+      ? { feed: adCreatives.feed, sidebar: adCreatives.sidebar }
+      : undefined,
+  };
+}
+
+router.post('/checkout', authMiddleware, async (req: AuthRequest, res) => {
+  const parsed = parseCheckoutBody(req.body || {});
+  if (!parsed.planCode) return res.status(400).json({ error: 'plan_code é obrigatório' });
 
   try {
     const result = await checkoutPlan({
       userId: req.user!.id,
-      planCode: plan_code.trim(),
-      targetId: target_id || undefined,
+      planCode: parsed.planCode,
+      targetId: parsed.targetId,
       paymentProvider: 'demo',
-      cardLast4: card_last4 || '4242',
-      promoCode: promo_code || undefined,
-      adCreative: parseAdCreative(ad_creative),
-      adCreatives: hasCreatives
-        ? {
-            feed: adCreatives.feed,
-            sidebar: adCreatives.sidebar,
-          }
-        : undefined,
+      cardLast4: parsed.cardLast4 || '4242',
+      promoCode: parsed.promoCode,
+      adCreative: parsed.adCreative,
+      adCreatives: parsed.adCreatives,
     });
     res.status(201).json({
       ok: true,
@@ -105,6 +118,66 @@ router.post('/checkout', authMiddleware, async (req: AuthRequest, res) => {
   } catch (err) {
     const e = err as Error & { status?: number };
     res.status(e.status || 500).json({ error: e.message || 'Falha no checkout' });
+  }
+});
+
+router.post('/paypal/create-order', authMiddleware, async (req: AuthRequest, res) => {
+  const parsed = parseCheckoutBody(req.body || {});
+  if (!parsed.planCode) return res.status(400).json({ error: 'plan_code é obrigatório' });
+
+  try {
+    const result = await createPaypalCheckout({
+      userId: req.user!.id,
+      planCode: parsed.planCode,
+      targetId: parsed.targetId,
+      promoCode: parsed.promoCode,
+      adCreative: parsed.adCreative,
+      adCreatives: parsed.adCreatives,
+      paymentProvider: 'paypal',
+    });
+
+    if (result.free) {
+      return res.status(201).json({
+        ok: true,
+        free: true,
+        message: 'Cupom aplicado. Benefício ativado sem cobrança.',
+        activated: result.activated,
+        order: result.order,
+        amount_cents: result.amount_cents,
+      });
+    }
+
+    res.status(201).json({
+      ok: true,
+      free: false,
+      orderId: result.orderId,
+      paypalOrderId: result.paypalOrderId,
+      amount_cents: result.amount_cents,
+      currency: result.currency,
+    });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    res.status(e.status || 500).json({ error: e.message || 'Falha ao criar pedido PayPal' });
+  }
+});
+
+router.post('/paypal/capture', authMiddleware, async (req: AuthRequest, res) => {
+  const paypalOrderId =
+    typeof req.body?.paypal_order_id === 'string' ? req.body.paypal_order_id.trim() : '';
+  if (!paypalOrderId) {
+    return res.status(400).json({ error: 'paypal_order_id é obrigatório' });
+  }
+
+  try {
+    const result = await capturePaypalCheckout(req.user!.id, paypalOrderId);
+    res.json({
+      ok: true,
+      message: 'Pagamento confirmado. Benefício ativado!',
+      ...result,
+    });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    res.status(e.status || 500).json({ error: e.message || 'Falha ao capturar pagamento PayPal' });
   }
 });
 

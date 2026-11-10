@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CreditCard, Sparkles } from 'lucide-react';
@@ -13,8 +13,14 @@ import {
   AdCampaignPanel,
   emptyAdCampaignForm,
 } from '@/components/billing/AdCampaignPanel';
+import { PayPalCheckoutButtons } from '@/components/billing/PayPalCheckoutButtons';
 import { adCampaignModeFromPlanCode, isAdCampaignPlan } from '@/lib/adPlacements';
 import { groupPlans } from '@/lib/planGroups';
+
+type PaymentConfig = {
+  provider: 'paypal' | 'demo';
+  paypal: { clientId: string; mode: 'sandbox' | 'live'; currency: string } | null;
+};
 
 type Plan = {
   id: string;
@@ -72,6 +78,13 @@ export function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [adCreativeFeed, setAdCreativeFeed] = useState(emptyAdCampaignForm());
   const [adCreativeSidebar, setAdCreativeSidebar] = useState(emptyAdCampaignForm());
+  const skipPaypalErrorRef = useRef(false);
+
+  const { data: paymentConfig } = useQuery({
+    queryKey: ['billing-payment-config'],
+    queryFn: () => api<PaymentConfig>('/billing/payment-config'),
+  });
+  const usePaypal = paymentConfig?.provider === 'paypal' && !!paymentConfig.paypal?.clientId;
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['billing-plans'],
@@ -117,45 +130,51 @@ export function PricingPage() {
   const needsAdCampaign = plan ? isAdCampaignPlan(plan.product_type, plan.code) : false;
   const jobPosts = myPosts.filter((p) => p.type === 'job');
 
+  const checkoutPayload = () => ({
+    plan_code: selected,
+    target_id: targetId || undefined,
+    card_last4: cardNumber.replace(/\D/g, '').slice(-4),
+    promo_code: promoCode.trim() || undefined,
+    ad_creatives: needsAdCampaign
+      ? {
+          feed: buildCreativePayload(adCreativeFeed),
+          sidebar: buildCreativePayload(adCreativeSidebar),
+        }
+      : undefined,
+  });
+
+  const refreshAfterPurchase = async (res?: { message?: string; activated?: { needs_creative?: boolean } }) => {
+    setError(null);
+    const msg =
+      res?.activated?.needs_creative
+        ? t('billing.adCampaignPurchasedSetup')
+        : res?.message || t('billing.success');
+    setDoneMsg(msg);
+    setAdCreativeFeed(emptyAdCampaignForm());
+    setAdCreativeSidebar(emptyAdCampaignForm());
+    await refreshUser();
+    qc.invalidateQueries({ queryKey: ['billing-orders'] });
+    qc.invalidateQueries({ queryKey: ['billing-ad-campaigns'] });
+    qc.invalidateQueries({ queryKey: ['advertisements'] });
+    qc.invalidateQueries({ queryKey: ['monetization-settings'] });
+    qc.invalidateQueries({ queryKey: ['my-businesses'] });
+    qc.invalidateQueries({ queryKey: ['posts'] });
+    qc.invalidateQueries({ queryKey: ['businesses'] });
+    qc.invalidateQueries({ queryKey: ['profile'] });
+    qc.invalidateQueries({ queryKey: ['classifieds'] });
+    qc.invalidateQueries({ queryKey: ['events'] });
+    qc.invalidateQueries({ queryKey: ['classifieds-mine'] });
+    qc.invalidateQueries({ queryKey: ['events-mine'] });
+  };
+
   const checkout = useMutation({
     mutationFn: () =>
       api<{ message?: string; activated?: { needs_creative?: boolean } }>('/billing/checkout', {
         method: 'POST',
-        body: JSON.stringify({
-          plan_code: selected,
-          target_id: targetId || undefined,
-          card_last4: cardNumber.replace(/\D/g, '').slice(-4),
-          promo_code: promoCode.trim() || undefined,
-          ad_creatives: needsAdCampaign
-            ? {
-                feed: buildCreativePayload(adCreativeFeed),
-                sidebar: buildCreativePayload(adCreativeSidebar),
-              }
-            : undefined,
-        }),
+        body: JSON.stringify(checkoutPayload()),
       }),
     onSuccess: async (res) => {
-      setError(null);
-      const msg =
-        res.activated?.needs_creative
-          ? t('billing.adCampaignPurchasedSetup')
-          : res.message || t('billing.success');
-      setDoneMsg(msg);
-      setAdCreativeFeed(emptyAdCampaignForm());
-      setAdCreativeSidebar(emptyAdCampaignForm());
-      await refreshUser();
-      qc.invalidateQueries({ queryKey: ['billing-orders'] });
-      qc.invalidateQueries({ queryKey: ['billing-ad-campaigns'] });
-      qc.invalidateQueries({ queryKey: ['advertisements'] });
-      qc.invalidateQueries({ queryKey: ['monetization-settings'] });
-      qc.invalidateQueries({ queryKey: ['my-businesses'] });
-      qc.invalidateQueries({ queryKey: ['posts'] });
-      qc.invalidateQueries({ queryKey: ['businesses'] });
-      qc.invalidateQueries({ queryKey: ['profile'] });
-      qc.invalidateQueries({ queryKey: ['classifieds'] });
-      qc.invalidateQueries({ queryKey: ['events'] });
-      qc.invalidateQueries({ queryKey: ['classifieds-mine'] });
-      qc.invalidateQueries({ queryKey: ['events-mine'] });
+      await refreshAfterPurchase(res);
     },
     onError: (err: Error) => {
       setDoneMsg(null);
@@ -163,14 +182,53 @@ export function PricingPage() {
     },
   });
 
-  const canPay =
+  const createPaypalOrder = async () => {
+    setError(null);
+    setDoneMsg(null);
+    skipPaypalErrorRef.current = false;
+    const res = await api<{
+      free?: boolean;
+      paypalOrderId?: string;
+      message?: string;
+      activated?: { needs_creative?: boolean };
+    }>('/billing/paypal/create-order', {
+      method: 'POST',
+      body: JSON.stringify(checkoutPayload()),
+    });
+
+    if (res.free) {
+      skipPaypalErrorRef.current = true;
+      await refreshAfterPurchase(res);
+      throw new Error('FREE_CHECKOUT');
+    }
+
+    if (!res.paypalOrderId) {
+      throw new Error(t('billing.paypalError'));
+    }
+    return res.paypalOrderId;
+  };
+
+  const capturePaypalOrder = async (paypalOrderId: string) => {
+    const res = await api<{ message?: string; activated?: { needs_creative?: boolean } }>(
+      '/billing/paypal/capture',
+      {
+        method: 'POST',
+        body: JSON.stringify({ paypal_order_id: paypalOrderId }),
+      }
+    );
+    await refreshAfterPurchase(res);
+  };
+
+  const selectionReady =
     !!plan &&
-    cardNumber.replace(/\D/g, '').length >= 12 &&
     (!needsBusiness || !!targetId) &&
     (!needsPost || !!targetId) &&
     (!needsJob || !!targetId) &&
     (!needsClassified || !!targetId) &&
     (!needsEvent || !!targetId);
+
+  const canPay =
+    selectionReady && (usePaypal || cardNumber.replace(/\D/g, '').length >= 12);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
@@ -265,7 +323,9 @@ export function PricingPage() {
             <CreditCard className="h-5 w-5 text-brand-600" />
             {t('billing.checkout')}
           </h3>
-          <p className="text-xs text-slate-500">{t('billing.demoHint')}</p>
+          <p className="text-xs text-slate-500">
+            {usePaypal ? t('billing.paypalHint') : t('billing.demoHint')}
+          </p>
 
           {needsBusiness && (
             <select
@@ -369,16 +429,20 @@ export function PricingPage() {
             </div>
           )}
 
-          <Input
-            placeholder={t('billing.cardName')}
-            value={cardName}
-            onChange={(e) => setCardName(e.target.value)}
-          />
-          <Input
-            placeholder={t('billing.cardNumber')}
-            value={cardNumber}
-            onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))}
-          />
+          {!usePaypal && (
+            <>
+              <Input
+                placeholder={t('billing.cardName')}
+                value={cardName}
+                onChange={(e) => setCardName(e.target.value)}
+              />
+              <Input
+                placeholder={t('billing.cardNumber')}
+                value={cardNumber}
+                onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, ''))}
+              />
+            </>
+          )}
           <Input
             placeholder={t('billing.promoCode')}
             value={promoCode}
@@ -388,15 +452,55 @@ export function PricingPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {doneMsg && <p className="text-sm text-emerald-700">{doneMsg}</p>}
 
-          <Button
-            className="w-full"
-            disabled={!canPay || checkout.isPending}
-            onClick={() => checkout.mutate()}
-          >
-            {checkout.isPending
-              ? t('common.loading')
-              : t('billing.payNow', { amount: plan ? formatMoney(payCents, plan.currency) : '' })}
-          </Button>
+          {usePaypal && paymentConfig?.paypal ? (
+            <PayPalCheckoutButtons
+              clientId={paymentConfig.paypal.clientId}
+              currency={paymentConfig.paypal.currency || plan?.currency || 'USD'}
+              disabled={!selectionReady}
+              onCreateOrder={async () => {
+                try {
+                  return await createPaypalOrder();
+                } catch (err) {
+                  if (err instanceof Error && err.message === 'FREE_CHECKOUT') {
+                    throw err;
+                  }
+                  setDoneMsg(null);
+                  setError(err instanceof Error ? err.message : t('common.error'));
+                  throw err;
+                }
+              }}
+              onApprove={async (paypalOrderId) => {
+                try {
+                  await capturePaypalOrder(paypalOrderId);
+                } catch (err) {
+                  setDoneMsg(null);
+                  setError(err instanceof Error ? err.message : t('common.error'));
+                  throw err;
+                }
+              }}
+              onError={(message) => {
+                if (skipPaypalErrorRef.current) {
+                  skipPaypalErrorRef.current = false;
+                  return;
+                }
+                setDoneMsg(null);
+                setError(message);
+              }}
+              onCancel={() => {
+                setError(t('billing.paypalCancelled'));
+              }}
+            />
+          ) : (
+            <Button
+              className="w-full"
+              disabled={!canPay || checkout.isPending}
+              onClick={() => checkout.mutate()}
+            >
+              {checkout.isPending
+                ? t('common.loading')
+                : t('billing.payNow', { amount: plan ? formatMoney(payCents, plan.currency) : '' })}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

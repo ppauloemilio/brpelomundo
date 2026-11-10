@@ -1,6 +1,14 @@
 import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { setMonetizationSettings } from './settings.js';
+import {
+  capturePaypalOrder,
+  createPaypalOrder,
+  isCaptureSuccessful,
+  paypalClientId,
+  paypalConfigured,
+  paypalMode,
+} from './paypal.js';
 
 export type BillingPlan = {
   id: string;
@@ -50,12 +58,19 @@ export type CheckoutInput = {
   userId: string;
   planCode: string;
   targetId?: string;
-  paymentProvider?: 'demo' | 'admin_comp';
+  paymentProvider?: 'demo' | 'admin_comp' | 'paypal';
   cardLast4?: string;
   promoCode?: string;
   /** @deprecated use adCreatives */
   adCreative?: AdCreativeInput;
   adCreatives?: AdCreativesInput;
+};
+
+type PreparedCheckout = {
+  plan: BillingPlan;
+  publicPlan: PublicPlan;
+  amountCents: number;
+  appliedPromo: Promotion | null;
 };
 
 export type AdPlacementSlot = 'feed' | 'sidebar';
@@ -422,7 +437,7 @@ function applyCoupon(baseCents: number, promo: Promotion) {
   return price;
 }
 
-export async function checkoutPlan(input: CheckoutInput) {
+async function prepareCheckout(input: CheckoutInput): Promise<PreparedCheckout> {
   const plan = await db.get<BillingPlan>(
     'SELECT * FROM billing_plans WHERE code = ? AND is_active = 1',
     [input.planCode]
@@ -441,13 +456,316 @@ export async function checkoutPlan(input: CheckoutInput) {
     amountCents = applyCoupon(amountCents, appliedPromo);
   }
 
+  await validateCheckoutTargets(input.userId, plan, input.targetId);
+  return { plan, publicPlan, amountCents, appliedPromo };
+}
+
+/** Read-only checks so we don't charge before knowing activation will work. */
+async function validateCheckoutTargets(
+  userId: string,
+  plan: BillingPlan,
+  targetId: string | undefined
+) {
+  if (plan.product_type === 'featured_business' || plan.product_type === 'local_business') {
+    if (!targetId) throw Object.assign(new Error('Selecione um negócio para destacar'), { status: 400 });
+    const biz = await db.get<{ id: string; owner_id: string }>(
+      'SELECT id, owner_id FROM businesses WHERE id = ? AND is_active = 1',
+      [targetId]
+    );
+    if (!biz || biz.owner_id !== userId) {
+      throw Object.assign(new Error('Negócio inválido'), { status: 400 });
+    }
+    return;
+  }
+
+  if (plan.product_type === 'promoted_post' || plan.product_type === 'promoted_job') {
+    if (!targetId) throw Object.assign(new Error('Selecione uma publicação para promover'), { status: 400 });
+    const post = await db.get<{ id: string; author_id: string; type: string }>(
+      'SELECT id, author_id, type FROM posts WHERE id = ? AND is_active = 1',
+      [targetId]
+    );
+    if (!post || post.author_id !== userId) {
+      throw Object.assign(new Error('Publicação inválida'), { status: 400 });
+    }
+    if (plan.product_type === 'promoted_job' && post.type !== 'job') {
+      throw Object.assign(new Error('Selecione uma publicação do tipo vaga'), { status: 400 });
+    }
+    return;
+  }
+
+  if (plan.product_type === 'classified_featured') {
+    if (!targetId) throw Object.assign(new Error('Selecione um classificado para destacar'), { status: 400 });
+    const listing = await db.get<{ id: string; seller_id: string }>(
+      'SELECT id, seller_id FROM classifieds WHERE id = ? AND is_active = 1',
+      [targetId]
+    );
+    if (!listing || listing.seller_id !== userId) {
+      throw Object.assign(new Error('Classificado inválido'), { status: 400 });
+    }
+    return;
+  }
+
+  if (plan.product_type === 'sponsored_event') {
+    if (!targetId) throw Object.assign(new Error('Selecione um evento para patrocinar'), { status: 400 });
+    const event = await db.get<{ id: string; organizer_id: string }>(
+      'SELECT id, organizer_id FROM community_events WHERE id = ? AND is_active = 1',
+      [targetId]
+    );
+    if (!event || event.organizer_id !== userId) {
+      throw Object.assign(new Error('Evento inválido'), { status: 400 });
+    }
+  }
+}
+
+export function getPaymentConfig() {
+  const configured = paypalConfigured();
+  return {
+    provider: configured ? ('paypal' as const) : ('demo' as const),
+    paypal: configured
+      ? {
+          clientId: paypalClientId(),
+          mode: paypalMode(),
+          currency: 'USD',
+        }
+      : null,
+  };
+}
+
+export async function createPaypalCheckout(input: CheckoutInput) {
+  if (!paypalConfigured()) {
+    throw Object.assign(new Error('PayPal não configurado'), { status: 503 });
+  }
+
+  const { plan, publicPlan, amountCents, appliedPromo } = await prepareCheckout(input);
+
+  // Cupom 100% → ativa sem cobrar no PayPal
+  if (amountCents <= 0) {
+    return {
+      free: true as const,
+      ...(await checkoutPlan({ ...input, paymentProvider: 'paypal', cardLast4: '0000' })),
+    };
+  }
+
+  const orderId = uuid();
+  const metadata = {
+    target_id: input.targetId || null,
+    coupon: appliedPromo?.code || null,
+    coupon_id: appliedPromo?.id || null,
+    list_price_cents: plan.price_cents,
+    plan_promo: publicPlan.has_promo,
+    ad_creatives: input.adCreatives || null,
+    ad_creative: input.adCreative || null,
+  };
+
+  await db.run(
+    `INSERT INTO billing_orders (
+       id, user_id, plan_id, plan_code, product_type, amount_cents, currency, status,
+       payment_provider, payment_ref, target_type, target_id, starts_at, ends_at, paid_at, metadata
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'paypal', '', NULL, ?, NULL, NULL, NULL, ?)`,
+    [
+      orderId,
+      input.userId,
+      plan.id,
+      plan.code,
+      plan.product_type,
+      amountCents,
+      plan.currency,
+      input.targetId || null,
+      JSON.stringify(metadata),
+    ]
+  );
+
+  const paypalOrder = await createPaypalOrder({
+    amountCents,
+    currency: plan.currency || 'USD',
+    description: plan.name,
+    customId: orderId,
+  });
+
+  await db.run('UPDATE billing_orders SET payment_ref = ? WHERE id = ?', [
+    paypalOrder.id,
+    orderId,
+  ]);
+
+  return {
+    free: false as const,
+    orderId,
+    paypalOrderId: paypalOrder.id,
+    amount_cents: amountCents,
+    currency: plan.currency,
+    plan: publicPlan,
+  };
+}
+
+export async function capturePaypalCheckout(userId: string, paypalOrderId: string) {
+  if (!paypalConfigured()) {
+    throw Object.assign(new Error('PayPal não configurado'), { status: 503 });
+  }
+
+  const pending = await db.get<{
+    id: string;
+    user_id: string;
+    plan_id: string;
+    plan_code: string;
+    amount_cents: number;
+    currency: string;
+    status: string;
+    payment_ref: string;
+    target_id: string | null;
+    metadata: string;
+  }>(
+    `SELECT * FROM billing_orders
+     WHERE payment_ref = ? AND payment_provider = 'paypal'
+     LIMIT 1`,
+    [paypalOrderId]
+  );
+
+  if (!pending) {
+    throw Object.assign(new Error('Pedido PayPal não encontrado'), { status: 404 });
+  }
+  if (pending.user_id !== userId) {
+    throw Object.assign(new Error('Pedido não pertence a este usuário'), { status: 403 });
+  }
+  if (pending.status === 'paid') {
+    const order = await db.get('SELECT * FROM billing_orders WHERE id = ?', [pending.id]);
+    const plan = await db.get<BillingPlan>('SELECT * FROM billing_plans WHERE id = ?', [pending.plan_id]);
+    return {
+      alreadyPaid: true,
+      order,
+      plan: plan ? toPublicPlan(plan) : null,
+      activated: null,
+      amount_cents: pending.amount_cents,
+    };
+  }
+  if (pending.status !== 'pending') {
+    throw Object.assign(new Error('Pedido não está pendente'), { status: 400 });
+  }
+
+  const capture = await capturePaypalOrder(paypalOrderId);
+  if (!isCaptureSuccessful(capture)) {
+    await db.run(
+      `UPDATE billing_orders SET status = 'failed', metadata = ? WHERE id = ?`,
+      [
+        JSON.stringify({
+          ...safeParseJson(pending.metadata),
+          paypal_capture: capture,
+        }),
+        pending.id,
+      ]
+    );
+    throw Object.assign(new Error('Pagamento PayPal não concluído'), { status: 402 });
+  }
+
+  const plan = await db.get<BillingPlan>('SELECT * FROM billing_plans WHERE id = ?', [pending.plan_id]);
+  if (!plan) throw Object.assign(new Error('Plano não encontrado'), { status: 404 });
+
+  const meta = safeParseJson(pending.metadata) as {
+    target_id?: string | null;
+    coupon_id?: string | null;
+    ad_creatives?: AdCreativesInput | null;
+    ad_creative?: AdCreativeInput | null;
+  };
+
+  const startsAt = new Date().toISOString();
+  const endsAt = addDaysIso(plan.duration_days);
+  let activation: { target_type: string; target_id: string; ends_at: string };
+  try {
+    activation = await activateEntitlement(
+      userId,
+      plan,
+      meta.target_id || pending.target_id || undefined,
+      endsAt,
+      meta.ad_creatives || undefined,
+      meta.ad_creative || undefined
+    );
+  } catch (err) {
+    throw Object.assign(err instanceof Error ? err : new Error('Falha ao ativar'), { status: 400 });
+  }
+
+  if (meta.coupon_id) {
+    await db.run('UPDATE billing_promotions SET used_count = used_count + 1 WHERE id = ?', [
+      meta.coupon_id,
+    ]);
+  }
+
+  const captureId = capture.purchase_units?.[0]?.payments?.captures?.[0]?.id || capture.id;
+
+  await db.run(
+    `UPDATE billing_orders SET
+       status = 'paid',
+       target_type = ?,
+       target_id = ?,
+       starts_at = ?,
+       ends_at = ?,
+       paid_at = utc_now(),
+       metadata = ?
+     WHERE id = ?`,
+    [
+      activation.target_type,
+      activation.target_id,
+      startsAt,
+      activation.ends_at,
+      JSON.stringify({
+        ...meta,
+        paypal_order_id: paypalOrderId,
+        paypal_capture_id: captureId,
+        paypal_status: capture.status,
+        ad_ids: (activation as { ad_ids?: string[] }).ad_ids || null,
+        placements: (activation as { placements?: string[] }).placements || null,
+      }),
+      pending.id,
+    ]
+  );
+
+  const order = await db.get('SELECT * FROM billing_orders WHERE id = ?', [pending.id]);
+  return {
+    alreadyPaid: false,
+    order,
+    plan: toPublicPlan(plan),
+    activated: activation,
+    amount_cents: pending.amount_cents,
+  };
+}
+
+function safeParseJson(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function checkoutPlan(input: CheckoutInput) {
+  const allowDemo =
+    process.env.PAYPAL_ALLOW_DEMO === '1' ||
+    process.env.NODE_ENV !== 'production' ||
+    !paypalConfigured();
+
+  if (
+    input.paymentProvider !== 'admin_comp' &&
+    paypalConfigured() &&
+    !allowDemo &&
+    input.paymentProvider !== 'paypal'
+  ) {
+    throw Object.assign(
+      new Error('Checkout demo desativado. Use PayPal.'),
+      { status: 400 }
+    );
+  }
+
+  const { plan, publicPlan, amountCents, appliedPromo } = await prepareCheckout(input);
+
   const orderId = uuid();
   const startsAt = new Date().toISOString();
   const endsAt = addDaysIso(plan.duration_days);
   const isComp = input.paymentProvider === 'admin_comp';
   const paymentRef = isComp
     ? `comp_${Date.now()}`
-    : `demo_${Date.now()}_${(input.cardLast4 || '4242').slice(-4)}`;
+    : input.paymentProvider === 'paypal'
+      ? `paypal_free_${Date.now()}`
+      : `demo_${Date.now()}_${(input.cardLast4 || '4242').slice(-4)}`;
 
   let activation: { target_type: string; target_id: string; ends_at: string };
   try {
