@@ -26,12 +26,7 @@ router.get('/payment-config', authMiddleware, async (_req, res) => {
 });
 
 router.get('/fx-rate', authMiddleware, async (_req, res) => {
-  try {
-    res.json(await getUsdBrlRate());
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'FX unavailable';
-    res.status(503).json({ error: message });
-  }
+  res.json(await getUsdBrlRate());
 });
 
 router.get('/plans', authMiddleware, async (_req, res) => {
