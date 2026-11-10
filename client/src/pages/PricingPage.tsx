@@ -83,7 +83,7 @@ export function PricingPage() {
   const [selected, setSelected] = useState<string>('premium_monthly');
   const [targetId, setTargetId] = useState('');
   const [cardName, setCardName] = useState(user?.full_name || '');
-  const [cardNumber, setCardNumber] = useState('4242424242424242');
+  const [cardNumber, setCardNumber] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,12 +93,14 @@ export function PricingPage() {
   const [pixLoading, setPixLoading] = useState(false);
   const skipPaypalErrorRef = useRef(false);
 
-  const { data: paymentConfig } = useQuery({
+  const { data: paymentConfig, isLoading: paymentConfigLoading } = useQuery({
     queryKey: ['billing-payment-config'],
     queryFn: () => api<PaymentConfig>('/billing/payment-config'),
   });
+  const paymentReady = !paymentConfigLoading && !!paymentConfig;
   const useMercadoPago = paymentConfig?.provider === 'mercadopago';
   const usePaypal = paymentConfig?.provider === 'paypal' && !!paymentConfig.paypal?.clientId;
+  const useDemoCheckout = paymentReady && paymentConfig?.provider === 'demo';
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['billing-plans'],
@@ -396,11 +398,13 @@ export function PricingPage() {
             {t('billing.checkout')}
           </h3>
           <p className="text-xs text-slate-500">
-            {useMercadoPago
-              ? t('billing.pixPayHint')
-              : usePaypal
-                ? t('billing.paypalHint')
-                : t('billing.demoHint')}
+            {!paymentReady
+              ? t('common.loading')
+              : useMercadoPago
+                ? t('billing.pixPayHint')
+                : usePaypal
+                  ? t('billing.paypalHint')
+                  : t('billing.demoHint')}
           </p>
 
           {needsBusiness && (
@@ -505,7 +509,7 @@ export function PricingPage() {
             </div>
           )}
 
-          {!usePaypal && !useMercadoPago && (
+          {useDemoCheckout && (
             <>
               <Input
                 placeholder={t('billing.cardName')}
@@ -528,7 +532,9 @@ export function PricingPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {doneMsg && <p className="text-sm text-emerald-700">{doneMsg}</p>}
 
-          {useMercadoPago ? (
+          {!paymentReady ? (
+            <p className="py-3 text-center text-sm text-slate-500">{t('common.loading')}</p>
+          ) : useMercadoPago ? (
             pixCheckout ? (
               <PixCheckoutPanel
                 orderId={pixCheckout.orderId}
