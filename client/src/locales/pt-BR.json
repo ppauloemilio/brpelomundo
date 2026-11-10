@@ -502,6 +502,7 @@
     "paypalError": "Não foi possível concluir o pagamento no PayPal. Tente novamente.",
     "paypalSdkError": "Não foi possível carregar o PayPal. Recarregue a página.",
     "paypalCancelled": "Pagamento cancelado.",
+    "usdApprox": "(Por apenas {{amount}})",
     "pixPayHint": "Pagamento via PIX (Mercado Pago) em reais (BRL). Escaneie o QR Code ou use Pix copia e cola.",
     "pixTitle": "Pague com PIX",
     "pixHint": "Abra o app do seu banco, escaneie o QR Code ou cole o código. A confirmação é automática.",

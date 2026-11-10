@@ -15,6 +15,7 @@ import {
   listUserBillingOrders,
   updateAdCampaignCreative,
 } from '../lib/billing.js';
+import { getUsdBrlRate } from '../lib/fx.js';
 import { mercadopagoConfigured } from '../lib/mercadopago.js';
 import { paramId } from '../lib/params.js';
 
@@ -22,6 +23,15 @@ const router = Router();
 
 router.get('/payment-config', authMiddleware, async (_req, res) => {
   res.json(getPaymentConfig());
+});
+
+router.get('/fx-rate', authMiddleware, async (_req, res) => {
+  try {
+    res.json(await getUsdBrlRate());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'FX unavailable';
+    res.status(503).json({ error: message });
+  }
 });
 
 router.get('/plans', authMiddleware, async (_req, res) => {

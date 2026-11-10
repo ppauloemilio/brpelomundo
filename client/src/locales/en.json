@@ -502,6 +502,7 @@
     "paypalError": "PayPal could not complete the payment. Please try again.",
     "paypalSdkError": "Could not load PayPal. Please reload the page.",
     "paypalCancelled": "Payment cancelled.",
+    "usdApprox": "(Only {{amount}})",
     "pixPayHint": "Pay with PIX (Mercado Pago) in Brazilian reais (BRL). Scan the QR code or use copy-and-paste.",
     "pixTitle": "Pay with PIX",
     "pixHint": "Open your bank app, scan the QR code or paste the code. Confirmation is automatic.",

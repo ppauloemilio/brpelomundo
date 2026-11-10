@@ -54,6 +54,12 @@ type Post = { id: string; content: string; created_at: string; type?: string };
 type Listing = { id: string; title: string };
 type CommunityEvent = { id: string; title: string; event_date: string };
 
+type FxRate = {
+  pair: 'USD-BRL';
+  usd_brl: number;
+  updated_at: string;
+};
+
 function formatMoney(cents: number, currency: string) {
   try {
     return new Intl.NumberFormat(undefined, {
@@ -64,6 +70,25 @@ function formatMoney(cents: number, currency: string) {
   } catch {
     return `${currency} ${(cents / 100).toFixed(2)}`;
   }
+}
+
+function formatUsdFromBrlCents(brlCents: number, usdBrl: number) {
+  if (!usdBrl || usdBrl <= 0) return null;
+  const usd = brlCents / 100 / usdBrl;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(usd);
+  } catch {
+    return `$${usd.toFixed(2)}`;
+  }
+}
+
+function usdApproxLabel(currency: string, brlCents: number, usdBrl?: number) {
+  if ((currency || 'BRL').toUpperCase() !== 'BRL' || !usdBrl) return null;
+  return formatUsdFromBrlCents(brlCents, usdBrl);
 }
 
 function buildCreativePayload(form: ReturnType<typeof emptyAdCampaignForm>) {
@@ -105,6 +130,13 @@ export function PricingPage() {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['billing-plans'],
     queryFn: () => api<Plan[]>('/billing/plans'),
+  });
+
+  const { data: fxRate } = useQuery({
+    queryKey: ['billing-fx-rate'],
+    queryFn: () => api<FxRate>('/billing/fx-rate'),
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
   });
 
   const { data: businesses = [] } = useQuery({
@@ -334,57 +366,69 @@ export function PricingPage() {
                 <p className="mt-1 text-sm text-slate-500">{t(`billing.groupHint.${group.id}`)}</p>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                {group.plans.map((p) => (
-                  <button
-                    key={p.code}
-                    type="button"
-                    onClick={() => {
-                      setSelected(p.code);
-                      setTargetId('');
-                      setAdCreativeFeed(emptyAdCampaignForm());
-                      setAdCreativeSidebar(emptyAdCampaignForm());
-                      setPixCheckout(null);
-                      setDoneMsg(null);
-                      setError(null);
-                    }}
-                    className={cn(
-                      'rounded-2xl border p-4 text-left transition',
-                      selected === p.code
-                        ? 'border-brand-500 bg-brand-50/60 ring-2 ring-brand-200'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-slate-900">{p.name}</h3>
-                      <div className="flex items-center gap-1">
+                {group.plans.map((p) => {
+                  const usdApprox = usdApproxLabel(
+                    p.currency,
+                    p.effective_price_cents ?? p.price_cents,
+                    fxRate?.usd_brl
+                  );
+                  return (
+                    <button
+                      key={p.code}
+                      type="button"
+                      onClick={() => {
+                        setSelected(p.code);
+                        setTargetId('');
+                        setAdCreativeFeed(emptyAdCampaignForm());
+                        setAdCreativeSidebar(emptyAdCampaignForm());
+                        setPixCheckout(null);
+                        setDoneMsg(null);
+                        setError(null);
+                      }}
+                      className={cn(
+                        'rounded-2xl border p-4 text-left transition',
+                        selected === p.code
+                          ? 'border-brand-500 bg-brand-50/60 ring-2 ring-brand-200'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-slate-900">{p.name}</h3>
+                        <div className="flex items-center gap-1">
+                          {p.has_promo && (
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                              {p.promo_badge || 'Promo'}
+                            </span>
+                          )}
+                          {selected === p.code && <Check className="h-5 w-5 text-brand-600" />}
+                        </div>
+                      </div>
+                      {p.product_type === 'featured_business' && (
+                        <p className="mt-1 text-sm font-medium text-brand-800">{t('billing.mapWorldwide')}</p>
+                      )}
+                      {p.product_type === 'local_business' && (
+                        <p className="mt-1 text-sm font-medium text-brand-800">{t('billing.mapCityOnly')}</p>
+                      )}
+                      <p className="mt-1 text-sm text-slate-500">{p.description}</p>
+                      <p className="mt-3 text-lg font-bold text-brand-800">
+                        {formatMoney(p.effective_price_cents ?? p.price_cents, p.currency)}
                         {p.has_promo && (
-                          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                            {p.promo_badge || 'Promo'}
+                          <span className="ml-2 text-sm font-normal text-slate-400 line-through">
+                            {formatMoney(p.original_price_cents ?? p.price_cents, p.currency)}
                           </span>
                         )}
-                        {selected === p.code && <Check className="h-5 w-5 text-brand-600" />}
-                      </div>
-                    </div>
-                    {p.product_type === 'featured_business' && (
-                      <p className="mt-1 text-sm font-medium text-brand-800">{t('billing.mapWorldwide')}</p>
-                    )}
-                    {p.product_type === 'local_business' && (
-                      <p className="mt-1 text-sm font-medium text-brand-800">{t('billing.mapCityOnly')}</p>
-                    )}
-                    <p className="mt-1 text-sm text-slate-500">{p.description}</p>
-                    <p className="mt-3 text-lg font-bold text-brand-800">
-                      {formatMoney(p.effective_price_cents ?? p.price_cents, p.currency)}
-                      {p.has_promo && (
-                        <span className="ml-2 text-sm font-normal text-slate-400 line-through">
-                          {formatMoney(p.original_price_cents ?? p.price_cents, p.currency)}
+                        <span className="ml-1 text-xs font-medium text-slate-500">
+                          / {p.duration_days}{t('billing.daysShort')}
                         </span>
+                      </p>
+                      {usdApprox && (
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">
+                          {t('billing.usdApprox', { amount: usdApprox })}
+                        </p>
                       )}
-                      <span className="ml-1 text-xs font-medium text-slate-500">
-                        / {p.duration_days}{t('billing.daysShort')}
-                      </span>
-                    </p>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </section>
           ))}
