@@ -25,13 +25,17 @@ type AdminUser = {
   created_at: string;
 };
 
-export function UsersSection() {
+type Props = {
+  initialStatus?: string;
+};
+
+export function UsersSection({ initialStatus = '' }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user, refreshUser } = useAuth();
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(initialStatus);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin-users-manage', q, status],

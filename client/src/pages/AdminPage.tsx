@@ -50,6 +50,12 @@ export function AdminPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [section, setSection] = useState<AdminSection>('dashboard');
+  const [usersFilter, setUsersFilter] = useState('');
+
+  const goToSection = (next: AdminSection, options?: { usersFilter?: string }) => {
+    setSection(next);
+    setUsersFilter(options?.usersFilter ?? '');
+  };
 
   const titles: Record<AdminSection, string> = {
     dashboard: t('admin.tabDashboard'),
@@ -83,7 +89,7 @@ export function AdminPage() {
         <aside className="lg:w-56 shrink-0">
           <nav className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 lg:flex-col lg:overflow-visible lg:bg-transparent lg:p-0">
             {NAV.map(({ key, labelKey, icon }) => (
-              <NavItem key={key} active={section === key} onClick={() => setSection(key)} icon={icon}>
+              <NavItem key={key} active={section === key} onClick={() => goToSection(key)} icon={icon}>
                 {t(labelKey)}
               </NavItem>
             ))}
@@ -92,8 +98,10 @@ export function AdminPage() {
 
         <main className="min-w-0 flex-1">
           <h2 className="mb-4 text-lg font-semibold text-slate-800">{titles[section]}</h2>
-          {section === 'dashboard' && <DashboardSection />}
-          {section === 'users' && <UsersSection />}
+          {section === 'dashboard' && <DashboardSection onOpenDetail={goToSection} />}
+          {section === 'users' && (
+            <UsersSection key={usersFilter || 'all'} initialStatus={usersFilter} />
+          )}
           {section === 'posts' && <PostsSection />}
           {section === 'businesses' && <BusinessesSection />}
           {section === 'content' && <ContentSection />}
