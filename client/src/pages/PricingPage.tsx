@@ -128,7 +128,19 @@ export function PricingPage() {
 
   const { data: orders = [] } = useQuery({
     queryKey: ['billing-orders'],
-    queryFn: () => api<Array<{ id: string; plan_name: string; amount_cents: number; currency: string; status: string; paid_at: string; ends_at: string }>>('/billing/orders'),
+    queryFn: () =>
+      api<
+        Array<{
+          id: string;
+          plan_name: string;
+          amount_cents: number;
+          currency: string;
+          status: string;
+          paid_at: string | null;
+          ends_at: string | null;
+          created_at: string;
+        }>
+      >('/billing/orders'),
   });
 
   const planGroups = useMemo(() => groupPlans(plans), [plans]);
@@ -526,7 +538,13 @@ export function PricingPage() {
                 onPaid={() => {
                   void refreshAfterPurchase({ message: t('billing.success') });
                 }}
-                onError={(message) => setError(message)}
+                onError={(message) => {
+                  setError(message);
+                  if (message === t('billing.pixExpired')) {
+                    setPixCheckout(null);
+                    qc.invalidateQueries({ queryKey: ['billing-orders'] });
+                  }
+                }}
               />
             ) : (
               <Button
@@ -598,20 +616,49 @@ export function PricingPage() {
           <CardContent className="space-y-3 pt-5">
             <h3 className="font-semibold text-slate-900">{t('billing.history')}</h3>
             <ul className="divide-y divide-slate-100">
-              {orders.map((o) => (
-                <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <div>
-                    <p className="font-medium text-slate-800">{o.plan_name}</p>
-                    <p className="text-xs text-slate-500">
-                      {o.paid_at ? new Date(o.paid_at).toLocaleString() : ''}
-                      {o.ends_at ? ` · ${t('billing.validUntil')} ${new Date(o.ends_at).toLocaleDateString()}` : ''}
-                    </p>
-                  </div>
-                  <span className="font-semibold text-slate-700">
-                    {formatMoney(o.amount_cents, o.currency)}
-                  </span>
-                </li>
-              ))}
+              {orders.map((o) => {
+                const isPaid = o.status === 'paid';
+                const isExpired = o.status === 'expired';
+                const isPending = o.status === 'pending';
+                return (
+                  <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-800">{o.plan_name}</p>
+                      <p className="text-xs text-slate-500">
+                        {isPaid && o.paid_at
+                          ? `${new Date(o.paid_at).toLocaleString()}${
+                              o.ends_at
+                                ? ` · ${t('billing.validUntil')} ${new Date(o.ends_at).toLocaleDateString()}`
+                                : ''
+                            }`
+                          : isExpired
+                            ? t('billing.orderExpired')
+                            : isPending
+                              ? t('billing.orderPending')
+                              : o.created_at
+                                ? new Date(o.created_at).toLocaleString()
+                                : ''}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="block font-semibold text-slate-700">
+                        {formatMoney(o.amount_cents, o.currency)}
+                      </span>
+                      {(isPending || isExpired) && (
+                        <span
+                          className={
+                            isExpired
+                              ? 'text-[11px] font-medium text-rose-600'
+                              : 'text-[11px] font-medium text-amber-700'
+                          }
+                        >
+                          {isExpired ? t('billing.statusExpired') : t('billing.statusPending')}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </CardContent>
         </Card>

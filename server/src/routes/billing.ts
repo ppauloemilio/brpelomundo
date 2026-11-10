@@ -12,6 +12,7 @@ import {
   getPaymentConfig,
   listPlans,
   listUserAdCampaigns,
+  listUserBillingOrders,
   updateAdCampaignCreative,
 } from '../lib/billing.js';
 import { mercadopagoConfigured } from '../lib/mercadopago.js';
@@ -28,16 +29,7 @@ router.get('/plans', authMiddleware, async (_req, res) => {
 });
 
 router.get('/orders', authMiddleware, async (req: AuthRequest, res) => {
-  const orders = await db.all(
-    `SELECT o.*, p.name AS plan_name
-     FROM billing_orders o
-     JOIN billing_plans p ON p.id = o.plan_id
-     WHERE o.user_id = ?
-     ORDER BY o.created_at DESC
-     LIMIT 50`,
-    [req.user!.id]
-  );
-  res.json(orders);
+  res.json(await listUserBillingOrders(req.user!.id));
 });
 
 router.get('/ad-campaigns', authMiddleware, async (req: AuthRequest, res) => {

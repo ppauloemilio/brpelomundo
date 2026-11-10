@@ -524,6 +524,34 @@ async function validateCheckoutTargets(
   }
 }
 
+/** Tempo de vida de pedido pendente (PIX/PayPal) antes de expirar. */
+export const PENDING_PAYMENT_TTL_MINUTES = 60;
+
+export async function expireStalePendingOrders(userId?: string) {
+  if (userId) {
+    await db.run(
+      `UPDATE billing_orders SET status = 'expired'
+       WHERE user_id = ?
+         AND status = 'pending'
+         AND (
+           (ends_at IS NOT NULL AND ends_at < utc_now())
+           OR (ends_at IS NULL AND created_at < utc_now(interval '-${PENDING_PAYMENT_TTL_MINUTES} minutes'))
+         )`,
+      [userId]
+    );
+    return;
+  }
+
+  await db.run(
+    `UPDATE billing_orders SET status = 'expired'
+     WHERE status = 'pending'
+       AND (
+         (ends_at IS NOT NULL AND ends_at < utc_now())
+         OR (ends_at IS NULL AND created_at < utc_now(interval '-${PENDING_PAYMENT_TTL_MINUTES} minutes'))
+       )`
+  );
+}
+
 export function getPaymentConfig() {
   if (mercadopagoConfigured()) {
     return {
@@ -571,6 +599,7 @@ export async function createPaypalCheckout(input: CheckoutInput) {
   }
 
   const orderId = uuid();
+  const expiresAt = new Date(Date.now() + PENDING_PAYMENT_TTL_MINUTES * 60 * 1000).toISOString();
   const metadata = {
     target_id: input.targetId || null,
     coupon: appliedPromo?.code || null,
@@ -579,13 +608,14 @@ export async function createPaypalCheckout(input: CheckoutInput) {
     plan_promo: publicPlan.has_promo,
     ad_creatives: input.adCreatives || null,
     ad_creative: input.adCreative || null,
+    payment_expires_at: expiresAt,
   };
 
   await db.run(
     `INSERT INTO billing_orders (
        id, user_id, plan_id, plan_code, product_type, amount_cents, currency, status,
        payment_provider, payment_ref, target_type, target_id, starts_at, ends_at, paid_at, metadata
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'paypal', '', NULL, ?, NULL, NULL, NULL, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'paypal', '', NULL, ?, NULL, ?, NULL, ?)`,
     [
       orderId,
       input.userId,
@@ -595,6 +625,7 @@ export async function createPaypalCheckout(input: CheckoutInput) {
       amountCents,
       plan.currency,
       input.targetId || null,
+      expiresAt,
       JSON.stringify(metadata),
     ]
   );
@@ -768,6 +799,7 @@ export async function createMercadoPagoCheckout(input: CheckoutInput) {
   // Garante moeda BRL no pedido mesmo se o plano ainda estiver desatualizado.
   const currency = 'BRL';
   const orderId = uuid();
+  const expiresAt = new Date(Date.now() + PENDING_PAYMENT_TTL_MINUTES * 60 * 1000).toISOString();
   const metadata = {
     target_id: input.targetId || null,
     coupon: appliedPromo?.code || null,
@@ -776,13 +808,14 @@ export async function createMercadoPagoCheckout(input: CheckoutInput) {
     plan_promo: publicPlan.has_promo,
     ad_creatives: input.adCreatives || null,
     ad_creative: input.adCreative || null,
+    payment_expires_at: expiresAt,
   };
 
   await db.run(
     `INSERT INTO billing_orders (
        id, user_id, plan_id, plan_code, product_type, amount_cents, currency, status,
        payment_provider, payment_ref, target_type, target_id, starts_at, ends_at, paid_at, metadata
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'mercadopago', '', NULL, ?, NULL, NULL, NULL, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'mercadopago', '', NULL, ?, NULL, ?, NULL, ?)`,
     [
       orderId,
       input.userId,
@@ -792,6 +825,7 @@ export async function createMercadoPagoCheckout(input: CheckoutInput) {
       amountCents,
       currency,
       input.targetId || null,
+      expiresAt,
       JSON.stringify(metadata),
     ]
   );
@@ -802,6 +836,7 @@ export async function createMercadoPagoCheckout(input: CheckoutInput) {
     externalReference: orderId,
     payerEmail: input.payerEmail || '',
     payerName: input.payerName || 'Cliente',
+    expirationMinutes: PENDING_PAYMENT_TTL_MINUTES,
   });
 
   await db.run(
@@ -929,6 +964,8 @@ export async function confirmMercadoPagoPayment(mpPaymentId: string, opts?: { us
     throw Object.assign(new Error('Mercado Pago não configurado'), { status: 503 });
   }
 
+  await expireStalePendingOrders(opts?.userId);
+
   const payment = await fetchMercadoPagoPayment(mpPaymentId);
   type PendingOrder = {
     id: string;
@@ -975,6 +1012,15 @@ export async function confirmMercadoPagoPayment(mpPaymentId: string, opts?: { us
     throw Object.assign(new Error('Pedido não pertence a este usuário'), { status: 403 });
   }
 
+  if (pending.status === 'expired') {
+    return {
+      paid: false,
+      status: 'expired',
+      orderId: pending.id,
+      amount_cents: pending.amount_cents,
+    };
+  }
+
   if (payment.status !== 'approved') {
     return {
       paid: false,
@@ -993,6 +1039,8 @@ export async function confirmMercadoPagoPayment(mpPaymentId: string, opts?: { us
 }
 
 export async function getMercadoPagoOrderStatus(userId: string, orderId: string) {
+  await expireStalePendingOrders(userId);
+
   const order = await db.get<{
     id: string;
     user_id: string;
@@ -1010,6 +1058,10 @@ export async function getMercadoPagoOrderStatus(userId: string, orderId: string)
     return { status: 'paid' as const, orderId: order.id, amount_cents: order.amount_cents };
   }
 
+  if (order.status === 'expired') {
+    return { status: 'expired' as const, orderId: order.id, amount_cents: order.amount_cents };
+  }
+
   if (order.payment_provider === 'mercadopago' && order.payment_ref) {
     const result = await confirmMercadoPagoPayment(order.payment_ref, { userId });
     if (result.paid) {
@@ -1020,10 +1072,26 @@ export async function getMercadoPagoOrderStatus(userId: string, orderId: string)
         activated: 'activated' in result ? result.activated : null,
       };
     }
+    if (result.status === 'expired') {
+      return { status: 'expired' as const, orderId: order.id, amount_cents: order.amount_cents };
+    }
     return { status: 'pending' as const, orderId: order.id, amount_cents: order.amount_cents, mpStatus: result.status };
   }
 
   return { status: order.status, orderId: order.id, amount_cents: order.amount_cents };
+}
+
+export async function listUserBillingOrders(userId: string) {
+  await expireStalePendingOrders(userId);
+  return db.all(
+    `SELECT o.*, p.name AS plan_name
+     FROM billing_orders o
+     JOIN billing_plans p ON p.id = o.plan_id
+     WHERE o.user_id = ?
+     ORDER BY o.created_at DESC
+     LIMIT 50`,
+    [userId]
+  );
 }
 
 function safeParseJson(raw: string | null | undefined): Record<string, unknown> {
