@@ -36,9 +36,9 @@ export function DashboardSection({ onOpenDetail }: Props) {
     return <p className="py-8 text-center text-slate-500">{t('common.loading')}</p>;
   }
 
-  const revenue = ((data.revenue_cents || 0) / 100).toLocaleString(undefined, {
+  const revenue = ((data.revenue_cents || 0) / 100).toLocaleString('pt-BR', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'BRL',
   });
 
   const cards: Array<{

@@ -5,12 +5,16 @@ import { authMiddleware, AuthRequest, optionalAuth } from '../middleware/auth.js
 import {
   capturePaypalCheckout,
   checkoutPlan,
+  confirmMercadoPagoPayment,
+  createMercadoPagoCheckout,
   createPaypalCheckout,
+  getMercadoPagoOrderStatus,
   getPaymentConfig,
   listPlans,
   listUserAdCampaigns,
   updateAdCampaignCreative,
 } from '../lib/billing.js';
+import { mercadopagoConfigured } from '../lib/mercadopago.js';
 import { paramId } from '../lib/params.js';
 
 const router = Router();
@@ -180,6 +184,93 @@ router.post('/paypal/capture', authMiddleware, async (req: AuthRequest, res) => 
     res.status(e.status || 500).json({ error: e.message || 'Falha ao capturar pagamento PayPal' });
   }
 });
+
+router.post('/mercadopago/create', authMiddleware, async (req: AuthRequest, res) => {
+  const parsed = parseCheckoutBody(req.body || {});
+  if (!parsed.planCode) return res.status(400).json({ error: 'plan_code é obrigatório' });
+
+  try {
+    const result = await createMercadoPagoCheckout({
+      userId: req.user!.id,
+      planCode: parsed.planCode,
+      targetId: parsed.targetId,
+      promoCode: parsed.promoCode,
+      adCreative: parsed.adCreative,
+      adCreatives: parsed.adCreatives,
+      paymentProvider: 'mercadopago',
+      payerEmail: req.user!.email,
+      payerName: req.user!.full_name || 'Cliente',
+    });
+
+    if (result.free) {
+      return res.status(201).json({
+        ok: true,
+        free: true,
+        message: 'Cupom aplicado. Benefício ativado sem cobrança.',
+        activated: result.activated,
+        order: result.order,
+        amount_cents: result.amount_cents,
+      });
+    }
+
+    res.status(201).json({
+      ok: true,
+      free: false,
+      orderId: result.orderId,
+      mpPaymentId: result.mpPaymentId,
+      pixCopyPaste: result.pixCopyPaste,
+      qrDataUrl: result.qrDataUrl,
+      amount_cents: result.amount_cents,
+      currency: result.currency,
+      status: result.status,
+    });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    res.status(e.status || 500).json({ error: e.message || 'Falha ao criar cobrança PIX' });
+  }
+});
+
+router.get('/mercadopago/status/:orderId', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const result = await getMercadoPagoOrderStatus(req.user!.id, paramId(req.params.orderId));
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    res.status(e.status || 500).json({ error: e.message || 'Falha ao consultar status' });
+  }
+});
+
+async function handleMercadoPagoWebhook(req: AuthRequest, res: import('express').Response) {
+  if (!mercadopagoConfigured()) {
+    return res.status(503).json({ error: 'Mercado Pago não configurado' });
+  }
+
+  let paymentId: string | undefined;
+  const body = req.body as { type?: string; action?: string; data?: { id?: string | number } };
+  if (body?.type === 'payment' && body.data?.id != null) {
+    paymentId = String(body.data.id);
+  }
+  if (!paymentId) {
+    const topic = typeof req.query.topic === 'string' ? req.query.topic : '';
+    const id = typeof req.query.id === 'string' ? req.query.id : '';
+    if (topic === 'payment' && id) paymentId = id;
+  }
+
+  if (!paymentId) {
+    return res.status(400).json({ error: 'payment id é obrigatório' });
+  }
+
+  try {
+    const result = await confirmMercadoPagoPayment(paymentId);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    res.status(e.status || 500).json({ error: e.message || 'Webhook Mercado Pago falhou' });
+  }
+}
+
+router.post('/webhooks/mercadopago', handleMercadoPagoWebhook);
+router.get('/webhooks/mercadopago', handleMercadoPagoWebhook);
 
 /** Public-ish ad event tracking (auth optional) */
 router.post('/ads/:id/events', optionalAuth, async (req: AuthRequest, res) => {

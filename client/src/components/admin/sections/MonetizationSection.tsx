@@ -32,7 +32,7 @@ type AdMetrics = {
   ads: Array<{ id: string; title: string; impressions: number; clicks: number; ctr: number; is_active: number }>;
 };
 
-function money(cents: number, currency = 'USD') {
+function money(cents: number, currency = 'BRL') {
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
   } catch {

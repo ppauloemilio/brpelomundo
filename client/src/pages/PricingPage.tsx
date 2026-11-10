@@ -14,12 +14,23 @@ import {
   emptyAdCampaignForm,
 } from '@/components/billing/AdCampaignPanel';
 import { PayPalCheckoutButtons } from '@/components/billing/PayPalCheckoutButtons';
+import { PixCheckoutPanel } from '@/components/billing/PixCheckoutPanel';
 import { adCampaignModeFromPlanCode, isAdCampaignPlan } from '@/lib/adPlacements';
 import { groupPlans } from '@/lib/planGroups';
 
 type PaymentConfig = {
-  provider: 'paypal' | 'demo';
+  provider: 'mercadopago' | 'paypal' | 'demo';
+  currency?: string;
+  mercadopago: { method: 'pix' } | null;
   paypal: { clientId: string; mode: 'sandbox' | 'live'; currency: string } | null;
+};
+
+type PixCheckoutState = {
+  orderId: string;
+  pixCopyPaste: string;
+  qrDataUrl: string;
+  amount_cents: number;
+  currency: string;
 };
 
 type Plan = {
@@ -78,12 +89,15 @@ export function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [adCreativeFeed, setAdCreativeFeed] = useState(emptyAdCampaignForm());
   const [adCreativeSidebar, setAdCreativeSidebar] = useState(emptyAdCampaignForm());
+  const [pixCheckout, setPixCheckout] = useState<PixCheckoutState | null>(null);
+  const [pixLoading, setPixLoading] = useState(false);
   const skipPaypalErrorRef = useRef(false);
 
   const { data: paymentConfig } = useQuery({
     queryKey: ['billing-payment-config'],
     queryFn: () => api<PaymentConfig>('/billing/payment-config'),
   });
+  const useMercadoPago = paymentConfig?.provider === 'mercadopago';
   const usePaypal = paymentConfig?.provider === 'paypal' && !!paymentConfig.paypal?.clientId;
 
   const { data: plans = [], isLoading } = useQuery({
@@ -150,6 +164,7 @@ export function PricingPage() {
         ? t('billing.adCampaignPurchasedSetup')
         : res?.message || t('billing.success');
     setDoneMsg(msg);
+    setPixCheckout(null);
     setAdCreativeFeed(emptyAdCampaignForm());
     setAdCreativeSidebar(emptyAdCampaignForm());
     await refreshUser();
@@ -219,6 +234,49 @@ export function PricingPage() {
     await refreshAfterPurchase(res);
   };
 
+  const startMercadoPagoPix = async () => {
+    setError(null);
+    setDoneMsg(null);
+    setPixLoading(true);
+    try {
+      const res = await api<{
+        free?: boolean;
+        orderId?: string;
+        pixCopyPaste?: string;
+        qrDataUrl?: string;
+        amount_cents?: number;
+        currency?: string;
+        message?: string;
+        activated?: { needs_creative?: boolean };
+      }>('/billing/mercadopago/create', {
+        method: 'POST',
+        body: JSON.stringify(checkoutPayload()),
+      });
+
+      if (res.free) {
+        await refreshAfterPurchase(res);
+        return;
+      }
+
+      if (!res.orderId || !res.pixCopyPaste || !res.qrDataUrl) {
+        throw new Error(t('billing.pixError'));
+      }
+
+      setPixCheckout({
+        orderId: res.orderId,
+        pixCopyPaste: res.pixCopyPaste,
+        qrDataUrl: res.qrDataUrl,
+        amount_cents: res.amount_cents || payCents,
+        currency: res.currency || 'BRL',
+      });
+    } catch (err) {
+      setPixCheckout(null);
+      setError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setPixLoading(false);
+    }
+  };
+
   const selectionReady =
     !!plan &&
     (!needsBusiness || !!targetId) &&
@@ -228,7 +286,8 @@ export function PricingPage() {
     (!needsEvent || !!targetId);
 
   const canPay =
-    selectionReady && (usePaypal || cardNumber.replace(/\D/g, '').length >= 12);
+    selectionReady &&
+    (useMercadoPago || usePaypal || cardNumber.replace(/\D/g, '').length >= 12);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
@@ -270,6 +329,7 @@ export function PricingPage() {
                       setTargetId('');
                       setAdCreativeFeed(emptyAdCampaignForm());
                       setAdCreativeSidebar(emptyAdCampaignForm());
+                      setPixCheckout(null);
                       setDoneMsg(null);
                       setError(null);
                     }}
@@ -324,7 +384,11 @@ export function PricingPage() {
             {t('billing.checkout')}
           </h3>
           <p className="text-xs text-slate-500">
-            {usePaypal ? t('billing.paypalHint') : t('billing.demoHint')}
+            {useMercadoPago
+              ? t('billing.pixPayHint')
+              : usePaypal
+                ? t('billing.paypalHint')
+                : t('billing.demoHint')}
           </p>
 
           {needsBusiness && (
@@ -429,7 +493,7 @@ export function PricingPage() {
             </div>
           )}
 
-          {!usePaypal && (
+          {!usePaypal && !useMercadoPago && (
             <>
               <Input
                 placeholder={t('billing.cardName')}
@@ -452,7 +516,30 @@ export function PricingPage() {
           {error && <p className="text-sm text-red-600">{error}</p>}
           {doneMsg && <p className="text-sm text-emerald-700">{doneMsg}</p>}
 
-          {usePaypal && paymentConfig?.paypal ? (
+          {useMercadoPago ? (
+            pixCheckout ? (
+              <PixCheckoutPanel
+                orderId={pixCheckout.orderId}
+                amountLabel={formatMoney(pixCheckout.amount_cents, pixCheckout.currency)}
+                pixCopyPaste={pixCheckout.pixCopyPaste}
+                qrDataUrl={pixCheckout.qrDataUrl}
+                onPaid={() => {
+                  void refreshAfterPurchase({ message: t('billing.success') });
+                }}
+                onError={(message) => setError(message)}
+              />
+            ) : (
+              <Button
+                className="w-full"
+                disabled={!canPay || pixLoading}
+                onClick={() => void startMercadoPagoPix()}
+              >
+                {pixLoading
+                  ? t('common.loading')
+                  : t('billing.payPix', { amount: plan ? formatMoney(payCents, plan.currency || 'BRL') : '' })}
+              </Button>
+            )
+          ) : usePaypal && paymentConfig?.paypal ? (
             <PayPalCheckoutButtons
               clientId={paymentConfig.paypal.clientId}
               currency={paymentConfig.paypal.currency || plan?.currency || 'USD'}

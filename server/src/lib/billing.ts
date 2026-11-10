@@ -9,6 +9,11 @@ import {
   paypalConfigured,
   paypalMode,
 } from './paypal.js';
+import {
+  createMercadoPagoPixCharge,
+  fetchMercadoPagoPayment,
+  mercadopagoConfigured,
+} from './mercadopago.js';
 
 export type BillingPlan = {
   id: string;
@@ -58,9 +63,11 @@ export type CheckoutInput = {
   userId: string;
   planCode: string;
   targetId?: string;
-  paymentProvider?: 'demo' | 'admin_comp' | 'paypal';
+  paymentProvider?: 'demo' | 'admin_comp' | 'paypal' | 'mercadopago';
   cardLast4?: string;
   promoCode?: string;
+  payerEmail?: string;
+  payerName?: string;
   /** @deprecated use adCreatives */
   adCreative?: AdCreativeInput;
   adCreatives?: AdCreativesInput;
@@ -156,8 +163,8 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'premium',
     name: 'Premium Mensal',
     description: 'Badge Premium, prioridade no Explorar e destaque no perfil.',
-    price_cents: 999,
-    currency: 'USD',
+    price_cents: 4990,
+    currency: 'BRL',
     duration_days: 30,
     sort_order: 1,
   },
@@ -166,8 +173,8 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'premium',
     name: 'Premium Anual',
     description: '12 meses de Premium com desconto.',
-    price_cents: 8999,
-    currency: 'USD',
+    price_cents: 44990,
+    currency: 'BRL',
     duration_days: 365,
     sort_order: 2,
   },
@@ -176,8 +183,8 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'featured_business',
     name: 'Destaque no mapa inteiro (30 dias)',
     description: 'Seu negócio aparece primeiro no mapa e nas listas, em qualquer cidade.',
-    price_cents: 3499,
-    currency: 'USD',
+    price_cents: 17490,
+    currency: 'BRL',
     duration_days: 30,
     sort_order: 3,
   },
@@ -186,8 +193,8 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'promoted_post',
     name: 'Post promovido (7 dias)',
     description: 'Sua publicação sobe no feed com selo Promovido.',
-    price_cents: 1499,
-    currency: 'USD',
+    price_cents: 7490,
+    currency: 'BRL',
     duration_days: 7,
     sort_order: 4,
   },
@@ -196,8 +203,8 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'ad_campaign',
     name: 'Combo feed + sidebar (30 dias)',
     description: 'Banners no feed (carrossel) e na sidebar. Economize comprando os dois espaços juntos.',
-    price_cents: 19900,
-    currency: 'USD',
+    price_cents: 99500,
+    currency: 'BRL',
     duration_days: 30,
     sort_order: 5,
   },
@@ -205,27 +212,42 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
 
 export async function seedBillingPlans() {
   const count = await db.get<{ c: number }>('SELECT COUNT(*) as c FROM billing_plans');
-  if ((count?.c ?? 0) > 0) return;
-
-  for (const plan of PLANS_SEED) {
-    await db.run(
-      `INSERT INTO billing_plans (
-         id, code, product_type, name, description, price_cents, currency, duration_days, is_active, sort_order
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-      [
-        uuid(),
-        plan.code,
-        plan.product_type,
-        plan.name,
-        plan.description,
-        plan.price_cents,
-        plan.currency,
-        plan.duration_days,
-        plan.sort_order,
-      ]
-    );
+  if ((count?.c ?? 0) === 0) {
+    for (const plan of PLANS_SEED) {
+      await db.run(
+        `INSERT INTO billing_plans (
+           id, code, product_type, name, description, price_cents, currency, duration_days, is_active, sort_order
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        [
+          uuid(),
+          plan.code,
+          plan.product_type,
+          plan.name,
+          plan.description,
+          plan.price_cents,
+          plan.currency,
+          plan.duration_days,
+          plan.sort_order,
+        ]
+      );
+    }
+    console.log('✅ Planos de cobrança seedados');
   }
-  console.log('✅ Planos de cobrança seedados');
+
+  // Migra planos antigos em USD para BRL (valores aproximados ×5).
+  await db.run(
+    `UPDATE billing_plans SET
+       currency = 'BRL',
+       price_cents = CASE code
+         WHEN 'premium_monthly' THEN 4990
+         WHEN 'premium_yearly' THEN 44990
+         WHEN 'featured_business_30d' THEN 17490
+         WHEN 'promoted_post_7d' THEN 7490
+         WHEN 'ad_campaign_30d' THEN 99500
+         ELSE CAST(ROUND(price_cents * 5.0) AS INTEGER)
+       END
+     WHERE UPPER(currency) = 'USD'`
+  );
 }
 
 function addDays(days: number, from = new Date()) {
@@ -518,16 +540,33 @@ async function validateCheckoutTargets(
 }
 
 export function getPaymentConfig() {
-  const configured = paypalConfigured();
+  if (mercadopagoConfigured()) {
+    return {
+      provider: 'mercadopago' as const,
+      currency: 'BRL',
+      mercadopago: { method: 'pix' as const },
+      paypal: null,
+    };
+  }
+
+  if (paypalConfigured()) {
+    return {
+      provider: 'paypal' as const,
+      currency: 'USD',
+      mercadopago: null,
+      paypal: {
+        clientId: paypalClientId(),
+        mode: paypalMode(),
+        currency: 'USD',
+      },
+    };
+  }
+
   return {
-    provider: configured ? ('paypal' as const) : ('demo' as const),
-    paypal: configured
-      ? {
-          clientId: paypalClientId(),
-          mode: paypalMode(),
-          currency: 'USD',
-        }
-      : null,
+    provider: 'demo' as const,
+    currency: 'BRL',
+    mercadopago: null,
+    paypal: null,
   };
 }
 
@@ -727,6 +766,281 @@ export async function capturePaypalCheckout(userId: string, paypalOrderId: strin
   };
 }
 
+export async function createMercadoPagoCheckout(input: CheckoutInput) {
+  if (!mercadopagoConfigured()) {
+    throw Object.assign(new Error('Mercado Pago não configurado'), { status: 503 });
+  }
+
+  const { plan, publicPlan, amountCents, appliedPromo } = await prepareCheckout(input);
+
+  if (amountCents <= 0) {
+    return {
+      free: true as const,
+      ...(await checkoutPlan({ ...input, paymentProvider: 'mercadopago', cardLast4: '0000' })),
+    };
+  }
+
+  // Garante moeda BRL no pedido mesmo se o plano ainda estiver desatualizado.
+  const currency = 'BRL';
+  const orderId = uuid();
+  const metadata = {
+    target_id: input.targetId || null,
+    coupon: appliedPromo?.code || null,
+    coupon_id: appliedPromo?.id || null,
+    list_price_cents: plan.price_cents,
+    plan_promo: publicPlan.has_promo,
+    ad_creatives: input.adCreatives || null,
+    ad_creative: input.adCreative || null,
+  };
+
+  await db.run(
+    `INSERT INTO billing_orders (
+       id, user_id, plan_id, plan_code, product_type, amount_cents, currency, status,
+       payment_provider, payment_ref, target_type, target_id, starts_at, ends_at, paid_at, metadata
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'mercadopago', '', NULL, ?, NULL, NULL, NULL, ?)`,
+    [
+      orderId,
+      input.userId,
+      plan.id,
+      plan.code,
+      plan.product_type,
+      amountCents,
+      currency,
+      input.targetId || null,
+      JSON.stringify(metadata),
+    ]
+  );
+
+  const pix = await createMercadoPagoPixCharge({
+    amountCents,
+    description: plan.name,
+    externalReference: orderId,
+    payerEmail: input.payerEmail || '',
+    payerName: input.payerName || 'Cliente',
+  });
+
+  await db.run(
+    `UPDATE billing_orders SET payment_ref = ?, metadata = ? WHERE id = ?`,
+    [
+      pix.paymentId,
+      JSON.stringify({
+        ...metadata,
+        mp_payment_id: pix.paymentId,
+        mp_status: pix.status,
+      }),
+      orderId,
+    ]
+  );
+
+  return {
+    free: false as const,
+    orderId,
+    mpPaymentId: pix.paymentId,
+    pixCopyPaste: pix.pixCopyPaste,
+    qrDataUrl: pix.qrDataUrl,
+    amount_cents: amountCents,
+    currency,
+    plan: publicPlan,
+    status: 'pending' as const,
+  };
+}
+
+async function fulfillPendingMercadoPagoOrder(pending: {
+  id: string;
+  user_id: string;
+  plan_id: string;
+  amount_cents: number;
+  status: string;
+  target_id: string | null;
+  metadata: string;
+  payment_ref: string;
+}) {
+  if (pending.status === 'paid') {
+    const order = await db.get('SELECT * FROM billing_orders WHERE id = ?', [pending.id]);
+    const plan = await db.get<BillingPlan>('SELECT * FROM billing_plans WHERE id = ?', [pending.plan_id]);
+    return {
+      alreadyPaid: true,
+      order,
+      plan: plan ? toPublicPlan(plan) : null,
+      activated: null,
+      amount_cents: pending.amount_cents,
+    };
+  }
+
+  if (pending.status !== 'pending') {
+    throw Object.assign(new Error('Pedido não está pendente'), { status: 400 });
+  }
+
+  const plan = await db.get<BillingPlan>('SELECT * FROM billing_plans WHERE id = ?', [pending.plan_id]);
+  if (!plan) throw Object.assign(new Error('Plano não encontrado'), { status: 404 });
+
+  const meta = safeParseJson(pending.metadata) as {
+    target_id?: string | null;
+    coupon_id?: string | null;
+    ad_creatives?: AdCreativesInput | null;
+    ad_creative?: AdCreativeInput | null;
+  };
+
+  const startsAt = new Date().toISOString();
+  const endsAt = addDaysIso(plan.duration_days);
+  let activation: { target_type: string; target_id: string; ends_at: string };
+  try {
+    activation = await activateEntitlement(
+      pending.user_id,
+      plan,
+      meta.target_id || pending.target_id || undefined,
+      endsAt,
+      meta.ad_creatives || undefined,
+      meta.ad_creative || undefined
+    );
+  } catch (err) {
+    throw Object.assign(err instanceof Error ? err : new Error('Falha ao ativar'), { status: 400 });
+  }
+
+  if (meta.coupon_id) {
+    await db.run('UPDATE billing_promotions SET used_count = used_count + 1 WHERE id = ?', [
+      meta.coupon_id,
+    ]);
+  }
+
+  await db.run(
+    `UPDATE billing_orders SET
+       status = 'paid',
+       target_type = ?,
+       target_id = ?,
+       starts_at = ?,
+       ends_at = ?,
+       paid_at = utc_now(),
+       metadata = ?
+     WHERE id = ? AND status = 'pending'`,
+    [
+      activation.target_type,
+      activation.target_id,
+      startsAt,
+      activation.ends_at,
+      JSON.stringify({
+        ...meta,
+        mp_payment_id: pending.payment_ref,
+        mp_status: 'approved',
+        ad_ids: (activation as { ad_ids?: string[] }).ad_ids || null,
+        placements: (activation as { placements?: string[] }).placements || null,
+      }),
+      pending.id,
+    ]
+  );
+
+  const order = await db.get('SELECT * FROM billing_orders WHERE id = ?', [pending.id]);
+  return {
+    alreadyPaid: false,
+    order,
+    plan: toPublicPlan(plan),
+    activated: activation,
+    amount_cents: pending.amount_cents,
+  };
+}
+
+export async function confirmMercadoPagoPayment(mpPaymentId: string, opts?: { userId?: string }) {
+  if (!mercadopagoConfigured()) {
+    throw Object.assign(new Error('Mercado Pago não configurado'), { status: 503 });
+  }
+
+  const payment = await fetchMercadoPagoPayment(mpPaymentId);
+  type PendingOrder = {
+    id: string;
+    user_id: string;
+    plan_id: string;
+    amount_cents: number;
+    status: string;
+    target_id: string | null;
+    metadata: string;
+    payment_ref: string;
+  };
+
+  let pending = await db.get<PendingOrder>(
+    `SELECT * FROM billing_orders
+     WHERE payment_ref = ? AND payment_provider = 'mercadopago'
+     LIMIT 1`,
+    [mpPaymentId]
+  );
+
+  if (!pending && payment.external_reference) {
+    const byRef = await db.get<PendingOrder>(
+      `SELECT * FROM billing_orders
+       WHERE id = ? AND payment_provider = 'mercadopago'
+       LIMIT 1`,
+      [payment.external_reference]
+    );
+    if (byRef) {
+      if (byRef.payment_ref !== mpPaymentId) {
+        await db.run('UPDATE billing_orders SET payment_ref = ? WHERE id = ?', [
+          mpPaymentId,
+          byRef.id,
+        ]);
+        byRef.payment_ref = mpPaymentId;
+      }
+      pending = byRef;
+    }
+  }
+
+  if (!pending) {
+    throw Object.assign(new Error('Pedido Mercado Pago não encontrado'), { status: 404 });
+  }
+
+  if (opts?.userId && pending.user_id !== opts.userId) {
+    throw Object.assign(new Error('Pedido não pertence a este usuário'), { status: 403 });
+  }
+
+  if (payment.status !== 'approved') {
+    return {
+      paid: false,
+      status: payment.status || 'pending',
+      orderId: pending.id,
+      amount_cents: pending.amount_cents,
+    };
+  }
+
+  const fulfilled = await fulfillPendingMercadoPagoOrder(pending);
+  return {
+    paid: true,
+    status: 'approved',
+    ...fulfilled,
+  };
+}
+
+export async function getMercadoPagoOrderStatus(userId: string, orderId: string) {
+  const order = await db.get<{
+    id: string;
+    user_id: string;
+    status: string;
+    payment_ref: string;
+    payment_provider: string;
+    amount_cents: number;
+  }>('SELECT * FROM billing_orders WHERE id = ?', [orderId]);
+
+  if (!order || order.user_id !== userId) {
+    throw Object.assign(new Error('Pedido não encontrado'), { status: 404 });
+  }
+
+  if (order.status === 'paid') {
+    return { status: 'paid' as const, orderId: order.id, amount_cents: order.amount_cents };
+  }
+
+  if (order.payment_provider === 'mercadopago' && order.payment_ref) {
+    const result = await confirmMercadoPagoPayment(order.payment_ref, { userId });
+    if (result.paid) {
+      return {
+        status: 'paid' as const,
+        orderId: order.id,
+        amount_cents: order.amount_cents,
+        activated: 'activated' in result ? result.activated : null,
+      };
+    }
+    return { status: 'pending' as const, orderId: order.id, amount_cents: order.amount_cents, mpStatus: result.status };
+  }
+
+  return { status: order.status, orderId: order.id, amount_cents: order.amount_cents };
+}
+
 function safeParseJson(raw: string | null | undefined): Record<string, unknown> {
   if (!raw) return {};
   try {
@@ -738,19 +1052,21 @@ function safeParseJson(raw: string | null | undefined): Record<string, unknown> 
 }
 
 export async function checkoutPlan(input: CheckoutInput) {
+  const realPaymentsConfigured = paypalConfigured() || mercadopagoConfigured();
   const allowDemo =
     process.env.PAYPAL_ALLOW_DEMO === '1' ||
     process.env.NODE_ENV !== 'production' ||
-    !paypalConfigured();
+    !realPaymentsConfigured;
 
   if (
     input.paymentProvider !== 'admin_comp' &&
-    paypalConfigured() &&
+    realPaymentsConfigured &&
     !allowDemo &&
-    input.paymentProvider !== 'paypal'
+    input.paymentProvider !== 'paypal' &&
+    input.paymentProvider !== 'mercadopago'
   ) {
     throw Object.assign(
-      new Error('Checkout demo desativado. Use PayPal.'),
+      new Error('Checkout demo desativado. Use Mercado Pago ou PayPal.'),
       { status: 400 }
     );
   }
@@ -765,7 +1081,9 @@ export async function checkoutPlan(input: CheckoutInput) {
     ? `comp_${Date.now()}`
     : input.paymentProvider === 'paypal'
       ? `paypal_free_${Date.now()}`
-      : `demo_${Date.now()}_${(input.cardLast4 || '4242').slice(-4)}`;
+      : input.paymentProvider === 'mercadopago'
+        ? `mp_free_${Date.now()}`
+        : `demo_${Date.now()}_${(input.cardLast4 || '4242').slice(-4)}`;
 
   let activation: { target_type: string; target_id: string; ends_at: string };
   try {
