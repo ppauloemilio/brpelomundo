@@ -163,7 +163,7 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'premium',
     name: 'Premium Mensal',
     description: 'Badge Premium, prioridade no Explorar e destaque no perfil.',
-    price_cents: 4990,
+    price_cents: 2490,
     currency: 'BRL',
     duration_days: 30,
     sort_order: 1,
@@ -173,7 +173,7 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'premium',
     name: 'Premium Anual',
     description: '12 meses de Premium com desconto.',
-    price_cents: 44990,
+    price_cents: 24990,
     currency: 'BRL',
     duration_days: 365,
     sort_order: 2,
@@ -183,7 +183,7 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'featured_business',
     name: 'Destaque no mapa inteiro (30 dias)',
     description: 'Seu negócio aparece primeiro no mapa e nas listas, em qualquer cidade.',
-    price_cents: 17490,
+    price_cents: 4990,
     currency: 'BRL',
     duration_days: 30,
     sort_order: 3,
@@ -193,7 +193,7 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'promoted_post',
     name: 'Post promovido (7 dias)',
     description: 'Sua publicação sobe no feed com selo Promovido.',
-    price_cents: 7490,
+    price_cents: 1490,
     currency: 'BRL',
     duration_days: 7,
     sort_order: 4,
@@ -203,7 +203,7 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
     product_type: 'ad_campaign',
     name: 'Combo feed + sidebar (30 dias)',
     description: 'Banners no feed (carrossel) e na sidebar. Economize comprando os dois espaços juntos.',
-    price_cents: 99500,
+    price_cents: 19900,
     currency: 'BRL',
     duration_days: 30,
     sort_order: 5,
@@ -212,42 +212,27 @@ const PLANS_SEED: Array<Omit<BillingPlan, 'id' | 'is_active'> & { is_active?: nu
 
 export async function seedBillingPlans() {
   const count = await db.get<{ c: number }>('SELECT COUNT(*) as c FROM billing_plans');
-  if ((count?.c ?? 0) === 0) {
-    for (const plan of PLANS_SEED) {
-      await db.run(
-        `INSERT INTO billing_plans (
-           id, code, product_type, name, description, price_cents, currency, duration_days, is_active, sort_order
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-        [
-          uuid(),
-          plan.code,
-          plan.product_type,
-          plan.name,
-          plan.description,
-          plan.price_cents,
-          plan.currency,
-          plan.duration_days,
-          plan.sort_order,
-        ]
-      );
-    }
-    console.log('✅ Planos de cobrança seedados');
-  }
+  if ((count?.c ?? 0) > 0) return;
 
-  // Migra planos antigos em USD para BRL (valores aproximados ×5).
-  await db.run(
-    `UPDATE billing_plans SET
-       currency = 'BRL',
-       price_cents = CASE code
-         WHEN 'premium_monthly' THEN 4990
-         WHEN 'premium_yearly' THEN 44990
-         WHEN 'featured_business_30d' THEN 17490
-         WHEN 'promoted_post_7d' THEN 7490
-         WHEN 'ad_campaign_30d' THEN 99500
-         ELSE CAST(ROUND(price_cents * 5.0) AS INTEGER)
-       END
-     WHERE UPPER(currency) = 'USD'`
-  );
+  for (const plan of PLANS_SEED) {
+    await db.run(
+      `INSERT INTO billing_plans (
+         id, code, product_type, name, description, price_cents, currency, duration_days, is_active, sort_order
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+      [
+        uuid(),
+        plan.code,
+        plan.product_type,
+        plan.name,
+        plan.description,
+        plan.price_cents,
+        plan.currency,
+        plan.duration_days,
+        plan.sort_order,
+      ]
+    );
+  }
+  console.log('✅ Planos de cobrança seedados');
 }
 
 function addDays(days: number, from = new Date()) {

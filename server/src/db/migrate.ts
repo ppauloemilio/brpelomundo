@@ -8,8 +8,8 @@ const EXTRA_PLANS = [
     product_type: 'classified_extra',
     name: 'Anúncio extra',
     description: 'Publique mais um classificado ativo além do limite gratuito.',
-    price_cents: 299,
-    currency: 'USD',
+    price_cents: 1490,
+    currency: 'BRL',
     duration_days: 365,
     sort_order: 6,
   },
@@ -18,8 +18,8 @@ const EXTRA_PLANS = [
     product_type: 'classified_featured',
     name: 'Classificado em destaque (7 dias)',
     description: 'Seu anúncio aparece no topo da lista da sua região.',
-    price_cents: 999,
-    currency: 'USD',
+    price_cents: 1490,
+    currency: 'BRL',
     duration_days: 7,
     sort_order: 7,
   },
@@ -28,8 +28,8 @@ const EXTRA_PLANS = [
     product_type: 'promoted_job',
     name: 'Vaga promovida (7 dias)',
     description: 'Sua vaga sobe no feed com selo Contratando.',
-    price_cents: 1499,
-    currency: 'USD',
+    price_cents: 990,
+    currency: 'BRL',
     duration_days: 7,
     sort_order: 8,
   },
@@ -38,8 +38,8 @@ const EXTRA_PLANS = [
     product_type: 'sponsored_event',
     name: 'Evento patrocinado (14 dias)',
     description: 'Seu evento aparece em destaque na lista da cidade.',
-    price_cents: 2499,
-    currency: 'USD',
+    price_cents: 1490,
+    currency: 'BRL',
     duration_days: 14,
     sort_order: 9,
   },
@@ -48,8 +48,8 @@ const EXTRA_PLANS = [
     product_type: 'local_business',
     name: 'Destaque só na cidade (30 dias)',
     description: 'Seu negócio aparece primeiro apenas no mapa da cidade dele. O alcance é menor que o destaque no mapa inteiro.',
-    price_cents: 2999,
-    currency: 'USD',
+    price_cents: 2490,
+    currency: 'BRL',
     duration_days: 30,
     sort_order: 10,
   },
@@ -61,8 +61,8 @@ const AD_PLACEMENT_PLANS = [
     product_type: 'ad_campaign',
     name: 'Banner no feed (30 dias)',
     description: 'Banner no carrossel do topo do feed, com impressões e cliques.',
-    price_cents: 14900,
-    currency: 'USD',
+    price_cents: 7490,
+    currency: 'BRL',
     duration_days: 30,
     sort_order: 51,
   },
@@ -71,8 +71,8 @@ const AD_PLACEMENT_PLANS = [
     product_type: 'ad_campaign',
     name: 'Banner na sidebar (30 dias)',
     description: 'Banner na coluna lateral (telas grandes), com impressões e cliques.',
-    price_cents: 7900,
-    currency: 'USD',
+    price_cents: 4990,
+    currency: 'BRL',
     duration_days: 30,
     sort_order: 52,
   },
@@ -97,6 +97,7 @@ async function migrateAdCampaignComboPlan() {
        name = ?,
        description = ?,
        price_cents = ?,
+       currency = 'BRL',
        sort_order = ?
      WHERE code = 'ad_campaign_30d'`,
     [
@@ -106,6 +107,35 @@ async function migrateAdCampaignComboPlan() {
       53,
     ]
   );
+}
+
+/** Converte planos USD → BRL uma vez (preços ×5, preservando a tabela atual). */
+async function migratePlansCurrencyToBrl() {
+  const flag = await db.get<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = 'billing_currency_brl_v1'`
+  );
+  if (flag) return;
+
+  await db.run(
+    `UPDATE billing_plans SET
+       price_cents = CAST(ROUND(price_cents * 5.0) AS INTEGER),
+       promo_price_cents = CASE
+         WHEN promo_price_cents IS NULL THEN NULL
+         ELSE CAST(ROUND(promo_price_cents * 5.0) AS INTEGER)
+       END,
+       currency = 'BRL'
+     WHERE UPPER(COALESCE(currency, 'USD')) <> 'BRL'`
+  );
+
+  await db.run(
+    `UPDATE billing_plans SET currency = 'BRL' WHERE currency IS NULL OR TRIM(currency) = ''`
+  );
+
+  await db.run(
+    `INSERT INTO app_settings (key, value) VALUES ('billing_currency_brl_v1', '1')
+     ON CONFLICT (key) DO NOTHING`
+  );
+  console.log('✅ Planos de cobrança migrados para BRL');
 }
 
 /** Colunas novas em bancos já existentes; idempotente para rodar a cada cold start. */
@@ -158,6 +188,7 @@ export async function migrateSchema() {
   await migrateBillingPlans();
   await migrateAdCampaignComboPlan();
   await fixMapHighlightPricing();
+  await migratePlansCurrencyToBrl();
   await restoreSmokeTestBio();
   await backfillAdCampaignOwners();
   await grandfatherEmailVerification();
