@@ -32,11 +32,11 @@ type AdMetrics = {
   ads: Array<{ id: string; title: string; impressions: number; clicks: number; ctr: number; is_active: number }>;
 };
 
-function money(cents: number, currency = 'BRL') {
+function money(cents: number) {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(cents / 100);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
   } catch {
-    return `${currency} ${(cents / 100).toFixed(2)}`;
+    return `R$ ${(cents / 100).toFixed(2)}`;
   }
 }
 
@@ -83,7 +83,10 @@ export function MonetizationSection() {
     return <p className="py-8 text-center text-slate-500">{t('common.loading')}</p>;
   }
 
-  const totalRevenue = revenue?.by_currency?.[0];
+  const totalRevenueCents =
+    revenue?.by_currency?.reduce((sum, row) => sum + (row.revenue_cents || 0), 0) ?? 0;
+  const totalOrdersCount =
+    revenue?.by_currency?.reduce((sum, row) => sum + (row.orders_count || 0), 0) ?? 0;
 
   return (
     <div className="space-y-4">
@@ -95,11 +98,11 @@ export function MonetizationSection() {
             </span>
             <div>
               <p className="text-2xl font-bold text-slate-900">
-                {totalRevenue ? money(totalRevenue.revenue_cents, totalRevenue.currency) : money(0)}
+                {money(totalRevenueCents)}
               </p>
               <p className="text-sm text-slate-600">{t('admin.revenueTotal')}</p>
               <p className="text-xs text-slate-400">
-                {totalRevenue?.orders_count ?? 0} {t('admin.paidOrders')}
+                {totalOrdersCount} {t('admin.paidOrders')}
               </p>
             </div>
           </CardContent>
@@ -197,7 +200,7 @@ export function MonetizationSection() {
                     <p className="font-medium text-slate-800">{o.plan_name}</p>
                     <p className="text-xs text-slate-500">{o.user_name} · {o.user_email}</p>
                   </div>
-                  <span className="font-semibold">{money(o.amount_cents, o.currency)}</span>
+                  <span className="font-semibold">{money(o.amount_cents)}</span>
                 </li>
               ))}
             </ul>
