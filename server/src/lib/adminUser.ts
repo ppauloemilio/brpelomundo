@@ -10,9 +10,13 @@ export async function promoteAdminByEmail(email: string) {
   await db.run('UPDATE users SET is_admin = 1 WHERE email = ?', [email]);
 }
 
-export async function createPasswordInvite(userId: string, email: string): Promise<string> {
+export async function createPasswordInvite(
+  userId: string,
+  email: string,
+  ttlMs = 7 * 24 * 60 * 60 * 1000
+): Promise<string> {
   const token = uuid();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
   await db.run(
     `INSERT INTO password_invites (id, user_id, token, email, expires_at) VALUES (?, ?, ?, ?, ?)`,
     [uuid(), userId, token, email, expiresAt]

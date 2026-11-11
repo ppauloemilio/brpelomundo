@@ -1,20 +1,61 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { Shield, ChevronRight, Sparkles, CreditCard } from 'lucide-react';
 import i18n from '@/i18n';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { legalLinks } from '@/components/legal/LegalFooter';
 
 export function SettingsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdError, setPwdError] = useState('');
+  const [pwdOk, setPwdOk] = useState(false);
 
   const changeLang = (lang: string) => {
     i18n.changeLanguage(lang);
     localStorage.setItem('comunidade_lang', lang);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdOk(false);
+    if (newPassword.length < 6) {
+      setPwdError(t('settings.passwordTooShort'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdError(t('settings.passwordMismatch'));
+      return;
+    }
+    setPwdLoading(true);
+    try {
+      await api('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPwdOk(true);
+    } catch (err) {
+      setPwdError(err instanceof Error ? err.message : t('common.error'));
+    } finally {
+      setPwdLoading(false);
+    }
   };
 
   return (
@@ -35,6 +76,55 @@ export function SettingsPage() {
           {user?.is_premium && (
             <p className="text-sm text-brand-700">{t('settings.premiumActive')}</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">{t('settings.changePassword')}</CardTitle></CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                {t('settings.currentPassword')}
+              </label>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                {t('settings.newPassword')}
+              </label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                {t('settings.confirmPassword')}
+              </label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+            {pwdError && <p className="text-sm text-red-600">{pwdError}</p>}
+            {pwdOk && <p className="text-sm text-emerald-700">{t('settings.passwordChanged')}</p>}
+            <Button type="submit" disabled={pwdLoading}>
+              {pwdLoading ? t('common.loading') : t('settings.savePassword')}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

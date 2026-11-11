@@ -74,6 +74,62 @@ function escapeHtml(value: string) {
   });
 }
 
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+  fullName: string,
+  kind: 'forgot' | 'admin' = 'forgot'
+) {
+  const resetUrl = `${APP_URL}/setup-password?token=${encodeURIComponent(token)}`;
+  const safeName = escapeHtml(fullName);
+  const subject =
+    kind === 'admin'
+      ? 'BR Pelo Mundo — Redefina sua senha (pedido do admin)'
+      : 'BR Pelo Mundo — Redefinição de senha';
+  const intro =
+    kind === 'admin'
+      ? 'Um administrador solicitou a redefinição da senha da sua conta no BR Pelo Mundo. A senha anterior foi desativada.'
+      : 'Recebemos um pedido para redefinir a senha da sua conta no BR Pelo Mundo.';
+  const text = `Olá ${fullName},
+
+${intro}
+
+Use o link abaixo para escolher uma nova senha (válido por 48 horas):
+
+${resetUrl}
+
+Se você não pediu isso, ignore este e-mail${kind === 'admin' ? ' e fale com o suporte' : ''}.
+
+Equipe BR Pelo Mundo`;
+
+  const html = `
+    <p>Olá <strong>${safeName}</strong>,</p>
+    <p>${escapeHtml(intro)}</p>
+    <p><a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#006847;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Escolher nova senha</a></p>
+    <p style="color:#64748b;font-size:14px">Ou copie este link: ${resetUrl}</p>
+    <p style="color:#64748b;font-size:14px">O link expira em 48 horas.</p>
+  `;
+
+  const transport = getTransport();
+  if (!transport) {
+    console.log('\n📧 [E-mail não configurado] Redefinição de senha:');
+    console.log(`   Para: ${email}`);
+    console.log(`   Link: ${resetUrl}\n`);
+    return { sent: false, resetUrl };
+  }
+
+  await transport.sendMail({
+    from: SMTP_FROM,
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  console.log(`📧 Redefinição de senha enviada para ${email}`);
+  return { sent: true, resetUrl };
+}
+
 export async function sendVerificationEmail(email: string, token: string, fullName: string) {
   const verifyUrl = `${APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
   const safeName = escapeHtml(fullName);

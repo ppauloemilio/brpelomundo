@@ -25,14 +25,15 @@ export function SetupPasswordPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: () => api<{ token: string }>('/auth/setup-password', {
-      method: 'POST',
-      body: JSON.stringify({ token, password }),
-    }),
+    mutationFn: () =>
+      api<{ token: string; user: { is_admin?: boolean } }>('/auth/setup-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, password }),
+      }),
     onSuccess: async (res) => {
       setToken(res.token);
       await refreshUser();
-      navigate('/admin');
+      navigate(res.user?.is_admin ? '/admin' : '/home');
     },
   });
 
@@ -63,7 +64,7 @@ export function SetupPasswordPage() {
       <Card className="w-full max-w-md">
         <CardContent className="space-y-4 pt-6">
           <h1 className="text-xl font-bold">{t('setupPassword.title')}</h1>
-          <p className="text-sm text-slate-600">{t('setupPassword.greeting', { name: invite.full_name })}</p>
+          <p className="text-sm text-slate-600">{t('setupPassword.greetingReset', { name: invite.full_name })}</p>
           <p className="text-sm text-slate-500">{invite.email}</p>
           <div>
             <label className="mb-1 block text-sm font-medium">{t('auth.password')}</label>

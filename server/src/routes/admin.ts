@@ -9,6 +9,7 @@ import { applyMonetizationExamples } from '../lib/seedMonetizationExamples.js';
 import { sendPasswordInviteEmail } from '../lib/email.js';
 import { paramId } from '../lib/params.js';
 import { deleteAccount } from '../lib/deleteAccount.js';
+import { issuePasswordReset } from '../lib/passwordReset.js';
 import { revenueSummary, adMetricsSummary, listAllPlans, updatePlan, listPromotions, createPromotion, updatePromotion, deletePromotion, grantComplimentary } from '../lib/billing.js';
 
 const router = Router();
@@ -314,6 +315,33 @@ router.patch('/users/:id', async (req: AuthRequest, res) => {
     }
   }
   res.json({ ok: true });
+});
+
+router.post('/users/:id/reset-password', async (req: AuthRequest, res) => {
+  const id = paramId(req.params.id);
+  const user = await db.get<{
+    id: string;
+    email: string;
+    full_name: string;
+    is_active: number;
+  }>('SELECT id, email, full_name, is_active FROM users WHERE id = ?', [id]);
+  if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+  if (user.is_active === 0) {
+    return res.status(400).json({ error: 'Conta desativada. Ative antes de redefinir a senha.' });
+  }
+
+  try {
+    const result = await issuePasswordReset(user.id, user.email, user.full_name, 'admin');
+    res.json({
+      ok: true,
+      sent: result.sent,
+      // Só útil em dev sem SMTP — não expor se o e-mail foi enviado
+      resetUrl: result.sent ? undefined : result.resetUrl,
+    });
+  } catch (err) {
+    console.error('Falha no reset de senha pelo admin:', err);
+    res.status(500).json({ error: 'Não foi possível enviar o e-mail de redefinição' });
+  }
 });
 
 router.delete('/users/:id', async (req: AuthRequest, res) => {

@@ -73,7 +73,13 @@
     "resendSent": "If this email is registered and not yet confirmed, we sent a new link.",
     "verifyTitle": "Confirming email",
     "verifySuccess": "Email confirmed. Signing you in…",
-    "verifyFailed": "Invalid or expired link. Sign in and ask for a new one."
+    "verifyFailed": "Invalid or expired link. Sign in and ask for a new one.",
+    "forgotLink": "Forgot password",
+    "forgotTitle": "Reset password",
+    "forgotSubtitle": "Enter the account email. If it exists, we will send a reset link.",
+    "forgotSubmit": "Send link",
+    "forgotSent": "If this email is registered, we sent a reset link. Check your inbox and spam folder.",
+    "backToLogin": "Back to sign in"
   },
   "onboarding": {
     "step": "Step {{current}} of {{total}}",
@@ -473,7 +479,15 @@
     "upgradePremium": "Subscribe or renew",
     "manageBilling": "Manage plans and payments",
     "legal": "About and policies",
-    "legalHint": "Who we are, privacy, terms of use, and safety"
+    "legalHint": "Who we are, privacy, terms of use, and safety",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "savePassword": "Save new password",
+    "passwordChanged": "Password updated successfully.",
+    "passwordTooShort": "New password must be at least 6 characters.",
+    "passwordMismatch": "Confirmation does not match the new password."
   },
   "billing": {
     "title": "Plans & billing",
@@ -631,6 +645,10 @@
     "contentGroups": "Groups",
     "searchContent": "Search title or owner",
     "deleteUserConfirm": "Delete {{name}}? The account is removed, along with their posts, comments, likes, businesses, listings, events, groups, ads and messages.",
+    "resetPassword": "Reset password",
+    "resetPasswordConfirm": "Reset password for {{name}}? The current password stops working and a link will be emailed.",
+    "resetPasswordSent": "Reset link sent to {{email}}.",
+    "resetPasswordDevLink": "SMTP is not configured. Use this local link:\n{{url}}",
     "deletePostConfirm": "Delete this post and its comments?",
     "deleteBusinessConfirm": "Delete {{name}}? It leaves the map and the lists.",
     "deleteAdConfirm": "Delete the ad {{name}}?",
@@ -748,10 +766,11 @@
   "setupPassword": {
     "title": "Set password",
     "greeting": "Hello, {{name}}! Choose a password to access administration.",
+    "greetingReset": "Hello, {{name}}! Choose a new password to sign in.",
     "confirm": "Confirm password",
     "submit": "Save and sign in",
-    "invalidLink": "Invalid link. Request a new invite.",
-    "expired": "Invalid or expired invite."
+    "invalidLink": "Invalid link. Request a new one.",
+    "expired": "Invalid or expired link."
   },
   "legal": {
     "navAbout": "About",

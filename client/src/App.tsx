@@ -23,6 +23,7 @@ import { EditProfilePage } from '@/pages/EditProfilePage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AdminPage } from '@/pages/AdminPage';
 import { SetupPasswordPage } from '@/pages/SetupPasswordPage';
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { GroupsPage } from '@/pages/GroupsPage';
 import { GroupDetailPage } from '@/pages/GroupDetailPage';
 import { EventsPage } from '@/pages/EventsPage';
@@ -86,6 +87,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
             <Route path="/setup-password" element={<SetupPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/sobre" element={<LegalPage />} />

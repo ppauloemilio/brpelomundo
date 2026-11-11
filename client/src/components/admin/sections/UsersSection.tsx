@@ -69,6 +69,26 @@ export function UsersSection({ initialStatus = '' }: Props) {
     },
   });
 
+  const resetPassword = useMutation({
+    mutationFn: (id: string) =>
+      api<{ ok: boolean; sent: boolean; resetUrl?: string }>(`/admin/users/${id}/reset-password`, {
+        method: 'POST',
+      }),
+    onSuccess: (data, id) => {
+      const target = users.find((u) => u.id === id);
+      if (data.sent) {
+        window.alert(t('admin.resetPasswordSent', { email: target?.email || '' }));
+      } else if (data.resetUrl) {
+        window.alert(t('admin.resetPasswordDevLink', { url: data.resetUrl }));
+      } else {
+        window.alert(t('admin.resetPasswordSent', { email: target?.email || '' }));
+      }
+    },
+    onError: (err) => {
+      window.alert(err instanceof Error ? err.message : t('common.error'));
+    },
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -147,6 +167,18 @@ export function UsersSection({ initialStatus = '' }: Props) {
                       onClick={() => patchUser.mutate({ id: u.id, body: { is_active: !u.is_active } })}
                     >
                       {u.is_active ? t('admin.deactivate') : t('admin.activate')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!u.is_active || resetPassword.isPending}
+                      onClick={() => {
+                        if (window.confirm(t('admin.resetPasswordConfirm', { name: u.full_name }))) {
+                          resetPassword.mutate(u.id);
+                        }
+                      }}
+                    >
+                      {t('admin.resetPassword')}
                     </Button>
                     {u.id !== user?.id && (
                       <Button

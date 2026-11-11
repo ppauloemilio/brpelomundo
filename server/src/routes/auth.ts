@@ -7,6 +7,7 @@ import { authMiddleware, AuthRequest, signToken } from '../middleware/auth.js';
 import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
 import { TERMS_VERSION } from '../lib/terms.js';
 import { issueEmailVerification } from '../lib/emailVerification.js';
+import { issuePasswordReset } from '../lib/passwordReset.js';
 
 const router = Router();
 
@@ -124,6 +125,59 @@ router.post('/resend-verification', async (req, res) => {
   res.json({ ok: true });
 });
 
+router.post('/forgot-password', async (req, res) => {
+  const email = String(req.body?.email || '').trim();
+  if (email) {
+    const user = await db.get<UserRow>(
+      'SELECT * FROM users WHERE lower(email) = lower(?)',
+      [email]
+    );
+    if (user && user.is_active !== 0) {
+      try {
+        await issuePasswordReset(user.id, user.email, user.full_name, 'forgot');
+      } catch (err) {
+        console.error('Falha ao enviar redefinição de senha:', err);
+      }
+    }
+  }
+  // Sempre 200 para não revelar se o e-mail existe.
+  res.json({ ok: true });
+});
+
+router.post('/change-password', authMiddleware, async (req: AuthRequest, res) => {
+  const currentPassword = String(req.body?.current_password || '');
+  const newPassword = String(req.body?.new_password || '');
+  if (!currentPassword || newPassword.length < 6) {
+    return res.status(400).json({
+      error: 'Informe a senha atual e a nova senha (mín. 6 caracteres)',
+    });
+  }
+
+  const user = await db.get<UserRow>('SELECT * FROM users WHERE id = ?', [req.user!.id]);
+  if (!user || user.is_active === 0) {
+    return res.status(403).json({ error: 'Conta indisponível' });
+  }
+  if (user.password_set === 0) {
+    return res.status(403).json({
+      error: 'Defina a senha pelo link enviado ao e-mail antes de trocá-la aqui.',
+    });
+  }
+  if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+    return res.status(401).json({ error: 'Senha atual incorreta' });
+  }
+
+  const hash = bcrypt.hashSync(newPassword, 10);
+  await db.run('UPDATE users SET password_hash = ?, password_set = 1 WHERE id = ?', [
+    hash,
+    user.id,
+  ]);
+  await db.run(
+    `UPDATE password_invites SET used_at = utc_now() WHERE user_id = ? AND used_at IS NULL`,
+    [user.id]
+  );
+  res.json({ ok: true });
+});
+
 router.post('/accept-terms', authMiddleware, async (req: AuthRequest, res) => {
   if (req.body?.accepted !== true) {
     return res.status(400).json({
@@ -146,9 +200,9 @@ router.get('/invite/:token', async (req, res) => {
      WHERE pi.token = ? AND pi.used_at IS NULL`,
     [req.params.token]
   );
-  if (!invite) return res.status(404).json({ error: 'Convite inválido ou já utilizado' });
+  if (!invite) return res.status(404).json({ error: 'Link inválido ou já utilizado' });
   if (new Date(invite.expires_at) < new Date()) {
-    return res.status(410).json({ error: 'Convite expirado. Solicite um novo ao administrador.' });
+    return res.status(410).json({ error: 'Link expirado. Solicite uma nova redefinição.' });
   }
   res.json({ email: invite.email, full_name: invite.full_name });
 });

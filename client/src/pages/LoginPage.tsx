@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight } from 'lucide-react';
 import i18n from '@/i18n';
@@ -100,9 +100,14 @@ export function LoginPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="login-password" className="text-sm font-medium text-slate-700">
-                {t('auth.password')}
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="login-password" className="text-sm font-medium text-slate-700">
+                  {t('auth.password')}
+                </label>
+                <Link to="/forgot-password" className="text-xs font-medium text-brand-700 hover:underline">
+                  {t('auth.forgotLink')}
+                </Link>
+              </div>
               <Input
                 id="login-password"
                 type="password"

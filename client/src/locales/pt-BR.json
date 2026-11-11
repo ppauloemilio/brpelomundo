@@ -73,7 +73,13 @@
     "resendSent": "Se o e-mail estiver cadastrado e ainda não confirmado, enviamos um novo link.",
     "verifyTitle": "Confirmando e-mail",
     "verifySuccess": "E-mail confirmado. Entrando…",
-    "verifyFailed": "Link inválido ou expirado. Entre e peça um novo envio."
+    "verifyFailed": "Link inválido ou expirado. Entre e peça um novo envio.",
+    "forgotLink": "Esqueci a senha",
+    "forgotTitle": "Recuperar senha",
+    "forgotSubtitle": "Informe o e-mail da conta. Se existir, enviaremos um link para redefinir a senha.",
+    "forgotSubmit": "Enviar link",
+    "forgotSent": "Se o e-mail estiver cadastrado, enviamos um link de redefinição. Confira a caixa de entrada e o spam.",
+    "backToLogin": "Voltar ao login"
   },
   "onboarding": {
     "step": "Passo {{current}} de {{total}}",
@@ -473,7 +479,15 @@
     "upgradePremium": "Assinar ou renovar",
     "manageBilling": "Gerenciar planos e pagamentos",
     "legal": "Sobre e políticas",
-    "legalHint": "Quem somos, privacidade, termos de uso e segurança"
+    "legalHint": "Quem somos, privacidade, termos de uso e segurança",
+    "changePassword": "Trocar senha",
+    "currentPassword": "Senha atual",
+    "newPassword": "Nova senha",
+    "confirmPassword": "Confirmar nova senha",
+    "savePassword": "Salvar nova senha",
+    "passwordChanged": "Senha atualizada com sucesso.",
+    "passwordTooShort": "A nova senha precisa ter pelo menos 6 caracteres.",
+    "passwordMismatch": "A confirmação não confere com a nova senha."
   },
   "billing": {
     "title": "Planos e cobrança",
@@ -631,6 +645,10 @@
     "contentGroups": "Grupos",
     "searchContent": "Buscar título ou responsável",
     "deleteUserConfirm": "Excluir {{name}}? A conta some, junto com publicações, comentários, curtidas, empresas, classificados, eventos, grupos, anúncios e mensagens.",
+    "resetPassword": "Redefinir senha",
+    "resetPasswordConfirm": "Redefinir a senha de {{name}}? A senha atual deixa de valer e um link será enviado por e-mail.",
+    "resetPasswordSent": "Link de redefinição enviado para {{email}}.",
+    "resetPasswordDevLink": "SMTP não configurado. Use este link localmente:\n{{url}}",
     "deletePostConfirm": "Excluir esta publicação e os comentários dela?",
     "deleteBusinessConfirm": "Excluir a empresa {{name}}? Ela sai do mapa e das listas.",
     "deleteAdConfirm": "Excluir o anúncio {{name}}?",
@@ -748,10 +766,11 @@
   "setupPassword": {
     "title": "Definir senha",
     "greeting": "Olá, {{name}}! Escolha uma senha para acessar a administração.",
+    "greetingReset": "Olá, {{name}}! Escolha uma nova senha para entrar na conta.",
     "confirm": "Confirmar senha",
     "submit": "Salvar e entrar",
-    "invalidLink": "Link inválido. Solicite um novo convite.",
-    "expired": "Convite inválido ou expirado."
+    "invalidLink": "Link inválido. Solicite um novo.",
+    "expired": "Link inválido ou expirado."
   },
   "legal": {
     "navAbout": "Sobre",
