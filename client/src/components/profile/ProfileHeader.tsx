@@ -77,7 +77,7 @@ export function ProfileHeader({
   const { t } = useTranslation();
   return (
     <Card className={cn('border-slate-200/80 shadow-sm', className)}>
-      <div className="group/cover relative h-36 overflow-hidden rounded-t-xl bg-brand-500 sm:h-44">
+      <div className="group/cover relative aspect-[8/3] w-full overflow-hidden rounded-t-xl bg-brand-500">
         {coverUrl ? (
           <CoverImage src={coverUrl} alt="" />
         ) : (

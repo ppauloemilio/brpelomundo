@@ -1,6 +1,11 @@
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPTED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
+/** Proporção da capa no perfil e no crop (igual ao banner). */
+export const COVER_ASPECT = 8 / 3;
+export const COVER_OUT_WIDTH = 1600;
+export const COVER_OUT_HEIGHT = 600;
+
 export type ImageValidationError = 'invalidType' | 'tooLarge';
 
 export type CropAreaPixels = {
@@ -79,11 +84,15 @@ export async function prepareAvatarImage(file: File, area?: CropAreaPixels): Pro
 
 export async function prepareCoverImage(file: File, area?: CropAreaPixels): Promise<File> {
   if (area) {
-    return cropImageToFile(file, area, { outWidth: 1600, outHeight: 600, filename: 'cover.jpg' });
+    return cropImageToFile(file, area, {
+      outWidth: COVER_OUT_WIDTH,
+      outHeight: COVER_OUT_HEIGHT,
+      filename: 'cover.jpg',
+    });
   }
 
   const img = await loadImage(file);
-  const targetRatio = 1600 / 600;
+  const targetRatio = COVER_ASPECT;
   let sw = img.width;
   let sh = img.height;
   let sx = 0;
@@ -98,6 +107,6 @@ export async function prepareCoverImage(file: File, area?: CropAreaPixels): Prom
   return cropImageToFile(
     file,
     { x: sx, y: sy, width: sw, height: sh },
-    { outWidth: 1600, outHeight: 600, filename: 'cover.jpg' }
+    { outWidth: COVER_OUT_WIDTH, outHeight: COVER_OUT_HEIGHT, filename: 'cover.jpg' }
   );
 }

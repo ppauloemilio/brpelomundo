@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
-import type { CropAreaPixels } from '@/lib/prepareProfileImage';
+import { COVER_ASPECT, type CropAreaPixels } from '@/lib/prepareProfileImage';
 import { cn } from '@/lib/utils';
 
 type Kind = 'avatar' | 'cover';
@@ -15,7 +15,7 @@ type Props = {
 
 const ASPECT: Record<Kind, number> = {
   avatar: 1,
-  cover: 1600 / 600,
+  cover: COVER_ASPECT,
 };
 
 function clamp(n: number, min: number, max: number) {
