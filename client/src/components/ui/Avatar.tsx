@@ -49,6 +49,10 @@ export function Avatar({
         alt={name}
         onLoad={() => setImageLoaded(true)}
         onError={() => setImageFailed(true)}
+        ref={(el) => {
+          // Cache do browser: onLoad pode ter disparado antes do React anexar o handler.
+          if (el?.complete && el.naturalWidth > 0) setImageLoaded(true);
+        }}
         className={cn(
           'h-full w-full object-cover object-center transition-opacity duration-300',
           imageLoaded ? 'opacity-100' : 'opacity-0'

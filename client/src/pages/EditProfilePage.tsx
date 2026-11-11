@@ -330,10 +330,10 @@ export function EditProfilePage() {
       </div>
 
       <ProfileHeader
-        coverUrl={preview.cover ?? form.cover_url}
-        avatarUrl={preview.avatar ?? form.avatar_url}
-        name={form.full_name || me?.full_name || 'U'}
-        username={form.username || me?.username}
+        coverUrl={preview.cover ?? form.cover_url || user?.profile?.cover_url || ''}
+        avatarUrl={preview.avatar ?? form.avatar_url ?? user?.avatar_url}
+        name={form.full_name || me?.full_name || user?.full_name || 'U'}
+        username={form.username || me?.username || user?.username}
         editable={{
           onCoverClick: () => coverRef.current?.click(),
           onAvatarClick: () => avatarRef.current?.click(),
