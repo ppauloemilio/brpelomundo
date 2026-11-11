@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
 import {
   prepareAvatarImage, prepareCoverImage, validateImageFile,
+  type CropAreaPixels,
 } from '@/lib/prepareProfileImage';
 import {
   SKILL_AREAS, PROFICIENCY_LEVELS, LANGUAGE_OPTIONS, SocialLinks,
@@ -78,6 +80,7 @@ export function EditProfilePage() {
   const [uploading, setUploading] = useState<'avatar' | 'cover' | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ avatar?: string; cover?: string }>({});
+  const [cropSession, setCropSession] = useState<{ kind: 'avatar' | 'cover'; file: File } | null>(null);
   const [langInput, setLangInput] = useState('');
   const [newSkill, setNewSkill] = useState({ name: '', level: 'intermediate', years: '' });
 
@@ -244,26 +247,25 @@ export function EditProfilePage() {
     qc.invalidateQueries({ queryKey: ['me-edit'] });
   };
 
-  const handleUpload = async (file: File, field: 'avatar_url' | 'cover_url') => {
-    const validation = validateImageFile(file);
-    if (validation) {
-      setUploadError(t(`editProfile.uploadError_${validation}`));
-      return;
-    }
-
+  const handleUpload = async (
+    file: File,
+    field: 'avatar_url' | 'cover_url',
+    area: CropAreaPixels
+  ) => {
     const kind = field === 'avatar_url' ? 'avatar' : 'cover';
     const previousUrl = form[field];
     setUploadError(null);
     setUploading(kind);
 
-    const blobUrl = URL.createObjectURL(file);
-    previewUrlsRef.current.push(blobUrl);
-    setPreview((p) => ({ ...p, [kind]: blobUrl }));
-
     try {
-      const prepared = kind === 'avatar'
-        ? await prepareAvatarImage(file)
-        : await prepareCoverImage(file);
+      const prepared =
+        kind === 'avatar'
+          ? await prepareAvatarImage(file, area)
+          : await prepareCoverImage(file, area);
+      const blobUrl = URL.createObjectURL(prepared);
+      previewUrlsRef.current.push(blobUrl);
+      setPreview((p) => ({ ...p, [kind]: blobUrl }));
+
       const { url } = await uploadFile(prepared);
       await persistPhoto(field, url);
       setPreview((p) => {
@@ -271,6 +273,8 @@ export function EditProfilePage() {
         delete next[kind];
         return next;
       });
+      URL.revokeObjectURL(blobUrl);
+      previewUrlsRef.current = previewUrlsRef.current.filter((u) => u !== blobUrl);
     } catch {
       setUploadError(t('editProfile.uploadError_failed'));
       setForm((f) => ({ ...f, [field]: previousUrl }));
@@ -280,8 +284,6 @@ export function EditProfilePage() {
         return next;
       });
     } finally {
-      URL.revokeObjectURL(blobUrl);
-      previewUrlsRef.current = previewUrlsRef.current.filter((u) => u !== blobUrl);
       setUploading(null);
       if (kind === 'avatar' && avatarRef.current) avatarRef.current.value = '';
       if (kind === 'cover' && coverRef.current) coverRef.current.value = '';
@@ -290,7 +292,23 @@ export function EditProfilePage() {
 
   const handleFilePick = (field: 'avatar_url' | 'cover_url') => (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleUpload(file, field);
+    if (!file) return;
+    const validation = validateImageFile(file);
+    if (validation) {
+      setUploadError(t(`editProfile.uploadError_${validation}`));
+      e.target.value = '';
+      return;
+    }
+    setUploadError(null);
+    setCropSession({
+      kind: field === 'avatar_url' ? 'avatar' : 'cover',
+      file,
+    });
+  };
+
+  const clearFileInput = (kind: 'avatar' | 'cover') => {
+    if (kind === 'avatar' && avatarRef.current) avatarRef.current.value = '';
+    if (kind === 'cover' && coverRef.current) coverRef.current.value = '';
   };
 
   const tabs: { key: EditTab; label: string }[] = [
@@ -325,6 +343,21 @@ export function EditProfilePage() {
       />
       <input ref={coverRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFilePick('cover_url')} />
       <input ref={avatarRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFilePick('avatar_url')} />
+      {cropSession && (
+        <ImageCropDialog
+          kind={cropSession.kind}
+          file={cropSession.file}
+          onCancel={() => {
+            clearFileInput(cropSession.kind);
+            setCropSession(null);
+          }}
+          onConfirm={(area) => {
+            const { kind, file } = cropSession;
+            setCropSession(null);
+            void handleUpload(file, kind === 'avatar' ? 'avatar_url' : 'cover_url', area);
+          }}
+        />
+      )}
       {uploadError && (
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{uploadError}</p>
       )}

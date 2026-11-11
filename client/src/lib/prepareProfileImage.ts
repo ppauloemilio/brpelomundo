@@ -3,6 +3,13 @@ const ACCEPTED = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export type ImageValidationError = 'invalidType' | 'tooLarge';
 
+export type CropAreaPixels = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export function validateImageFile(file: File): ImageValidationError | null {
   if (!ACCEPTED.has(file.type)) return 'invalidType';
   if (file.size > MAX_BYTES) return 'tooLarge';
@@ -31,47 +38,66 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
   });
 }
 
-export async function prepareAvatarImage(file: File): Promise<File> {
+/** Recorta a área escolhida pelo usuário e gera o arquivo final. */
+export async function cropImageToFile(
+  file: File,
+  area: CropAreaPixels,
+  opts: { outWidth: number; outHeight: number; filename: string }
+): Promise<File> {
+  const img = await loadImage(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = opts.outWidth;
+  canvas.height = opts.outHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return file;
+
+  const sx = Math.max(0, Math.min(img.width, area.x));
+  const sy = Math.max(0, Math.min(img.height, area.y));
+  const sw = Math.max(1, Math.min(img.width - sx, area.width));
+  const sh = Math.max(1, Math.min(img.height - sy, area.height));
+
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, opts.outWidth, opts.outHeight);
+  const blob = await canvasToBlob(canvas, 'image/jpeg', 0.88);
+  return new File([blob], opts.filename, { type: 'image/jpeg' });
+}
+
+export async function prepareAvatarImage(file: File, area?: CropAreaPixels): Promise<File> {
+  if (area) {
+    return cropImageToFile(file, area, { outWidth: 512, outHeight: 512, filename: 'avatar.jpg' });
+  }
+
   const img = await loadImage(file);
   const crop = Math.min(img.width, img.height);
   const sx = (img.width - crop) / 2;
   const sy = (img.height - crop) / 2;
-  const size = 512;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return file;
-
-  ctx.drawImage(img, sx, sy, crop, crop, 0, 0, size, size);
-  const blob = await canvasToBlob(canvas, 'image/jpeg', 0.88);
-  return new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+  return cropImageToFile(
+    file,
+    { x: sx, y: sy, width: crop, height: crop },
+    { outWidth: 512, outHeight: 512, filename: 'avatar.jpg' }
+  );
 }
 
-export async function prepareCoverImage(file: File): Promise<File> {
+export async function prepareCoverImage(file: File, area?: CropAreaPixels): Promise<File> {
+  if (area) {
+    return cropImageToFile(file, area, { outWidth: 1600, outHeight: 600, filename: 'cover.jpg' });
+  }
+
   const img = await loadImage(file);
-  const maxW = 1600;
-  const maxH = 600;
-
-  let width = img.width;
-  let height = img.height;
-  if (width > maxW) {
-    height = (height * maxW) / width;
-    width = maxW;
+  const targetRatio = 1600 / 600;
+  let sw = img.width;
+  let sh = img.height;
+  let sx = 0;
+  let sy = 0;
+  if (img.width / img.height > targetRatio) {
+    sw = img.height * targetRatio;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / targetRatio;
+    sy = (img.height - sh) / 2;
   }
-  if (height > maxH) {
-    width = (width * maxH) / height;
-    height = maxH;
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(width);
-  canvas.height = Math.round(height);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return file;
-
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const blob = await canvasToBlob(canvas, 'image/jpeg', 0.88);
-  return new File([blob], 'cover.jpg', { type: 'image/jpeg' });
+  return cropImageToFile(
+    file,
+    { x: sx, y: sy, width: sw, height: sh },
+    { outWidth: 1600, outHeight: 600, filename: 'cover.jpg' }
+  );
 }
