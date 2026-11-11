@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -69,7 +69,7 @@ export function ProfileView({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { user: me } = useAuth();
+  const { user: me, patchUser } = useAuth();
   const [tab, setTab] = useState<Tab>(defaultTab);
   const [blocked, setBlocked] = useState(false);
 
@@ -77,6 +77,13 @@ export function ProfileView({
     queryKey: ['profile', userId],
     queryFn: () => api<ProfileData>(`/users/${userId}`),
   });
+
+  // Mantém o avatar do header (auth) alinhado com o perfil carregado.
+  useEffect(() => {
+    if (!isOwner || !user?.avatar_url || !me?.id || me.id !== user.id) return;
+    if (me.avatar_url === user.avatar_url) return;
+    patchUser({ avatar_url: user.avatar_url });
+  }, [isOwner, user?.id, user?.avatar_url, me?.id, me?.avatar_url, patchUser]);
 
   const followMutation = useMutation({
     mutationFn: () =>

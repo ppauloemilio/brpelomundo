@@ -116,8 +116,15 @@ export function Layout() {
                 <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
               )}
             </button>
-            <button type="button" onClick={() => navigate('/profile')} className={cn('rounded-full ring-2 ring-transparent hover:ring-brand-200', user?.is_premium && 'ring-brand-300')}>
-              <Avatar src={user?.avatar_url} name={user?.full_name || 'U'} className="h-8 w-8" />
+            <button type="button" onClick={() => navigate('/profile')} className="rounded-full">
+              <Avatar
+                src={user?.avatar_url}
+                name={user?.full_name || 'U'}
+                className={cn(
+                  'h-8 w-8 border border-slate-300',
+                  user?.is_premium && 'border-brand-300'
+                )}
+              />
             </button>
             <button
               type="button"

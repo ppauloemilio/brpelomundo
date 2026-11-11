@@ -112,8 +112,8 @@ export function ProfileHeader({
                 src={avatarUrl}
                 loading={editable?.avatarLoading}
                 className={cn(
-                  'relative z-10 h-24 w-24 ring-[0.5px] ring-black shadow-lg sm:h-28 sm:w-28',
-                  isPremium && 'ring-brand-300'
+                  'relative z-10 h-24 w-24 border border-slate-300 shadow-lg sm:h-28 sm:w-28',
+                  isPremium && 'border-brand-300'
                 )}
               />
               {editable?.onAvatarClick && (

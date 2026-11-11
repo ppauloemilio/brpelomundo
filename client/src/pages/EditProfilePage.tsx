@@ -68,7 +68,7 @@ export function EditProfilePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { user, refreshUser, logout } = useAuth();
+  const { user, refreshUser, patchUser, logout } = useAuth();
   const [tab, setTab] = useState<EditTab>('info');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -229,7 +229,17 @@ export function EditProfilePage() {
       avatar_url: updated.avatar_url,
       cover_url: updated.cover_url ?? f.cover_url,
     }));
-    refreshUser();
+    if (field === 'avatar_url') {
+      patchUser({ avatar_url: updated.avatar_url });
+    } else {
+      patchUser({
+        profile: {
+          ...(user?.profile || {}),
+          cover_url: updated.cover_url ?? user?.profile?.cover_url,
+        },
+      });
+    }
+    await refreshUser();
     qc.invalidateQueries({ queryKey: ['profile', user?.id] });
     qc.invalidateQueries({ queryKey: ['me-edit'] });
   };

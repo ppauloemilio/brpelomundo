@@ -43,6 +43,7 @@ type AuthContextType = {
   }) => Promise<{ email: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  patchUser: (partial: Partial<User>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -98,8 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const patchUser = (partial: Partial<User>) => {
+    setUser((current) => (current ? { ...current, ...partial } : current));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, patchUser }}>
       {children}
     </AuthContext.Provider>
   );
