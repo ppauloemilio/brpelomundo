@@ -112,7 +112,7 @@ export function ProfileHeader({
                 src={avatarUrl}
                 loading={editable?.avatarLoading}
                 className={cn(
-                  'relative z-10 h-24 w-24 ring-4 ring-white shadow-lg sm:h-28 sm:w-28',
+                  'relative z-10 h-24 w-24 ring-1 ring-black shadow-lg sm:h-28 sm:w-28',
                   isPremium && 'ring-brand-300'
                 )}
               />
