@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { parseJson, userSnapshot, UserRow } from '../db/database.js';
+import { hydrateUserSnapshot, liveUsersByIds } from '../lib/liveSnapshots.js';
 import { authMiddleware, AuthRequest, createNotification } from '../middleware/auth.js';
 import { paramId } from '../lib/params.js';
 
@@ -171,15 +172,26 @@ router.get('/friendships', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 router.get('/notifications', authMiddleware, async (req: AuthRequest, res) => {
-  const notifications = await db.all<Record<string, unknown>>(
+  const notifications = await db.all<{
+    actor_id?: string;
+    actor_snapshot: string;
+    is_read?: number;
+    [key: string]: unknown;
+  }>(
     'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
     [req.user!.id]
+  );
+  const liveByActor = await liveUsersByIds(
+    notifications.map((n) => String(n.actor_id || ''))
   );
   res.json(
     notifications.map((n) => ({
       ...n,
-      actor_snapshot: parseJson((n as { actor_snapshot: string }).actor_snapshot, {}),
-      is_read: !!(n as { is_read: number }).is_read,
+      actor_snapshot: hydrateUserSnapshot(
+        parseJson(n.actor_snapshot, {}) as Record<string, unknown>,
+        liveByActor.get(String(n.actor_id || ''))
+      ),
+      is_read: !!n.is_read,
     }))
   );
 });

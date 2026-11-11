@@ -33,7 +33,11 @@ export function CreatePostCard() {
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-left transition-colors hover:bg-slate-50"
             onClick={() => navigate('/create-post')}
           >
-            <Avatar name={user?.full_name || 'U'} src={user?.avatar_url} className="h-10 w-10 shrink-0" />
+            <Avatar
+              name={user?.full_name || 'U'}
+              src={user?.avatar_url}
+              className="h-10 w-10 shrink-0 border border-slate-300"
+            />
             <span className="truncate text-slate-400">
               {t('feed.whatsHappening', { name: firstName })}
             </span>

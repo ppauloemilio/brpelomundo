@@ -123,7 +123,11 @@ export function PostCard({ post }: { post: Post }) {
         <CardContent className="space-y-3 pt-4">
           <div className="flex items-start gap-3">
             <UserLink userId={post.author_id} className="shrink-0 no-underline">
-              <Avatar name={post.author_snapshot.full_name} src={post.author_snapshot.avatar_url} className="h-11 w-11" />
+              <Avatar
+                name={post.author_snapshot.full_name}
+                src={post.author_snapshot.avatar_url}
+                className="h-11 w-11 border border-slate-300"
+              />
             </UserLink>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-[15px] leading-tight">

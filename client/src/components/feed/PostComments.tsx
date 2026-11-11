@@ -113,7 +113,11 @@ export function PostComments({ postId, postAuthorId, commentsEnabled, currentUse
     <div key={c.id} className={depth > 0 ? 'ml-6 mt-2 border-l-2 border-slate-100 pl-3' : ''}>
       <div className="flex gap-2">
         <UserLink userId={c.author_id} className="shrink-0 no-underline">
-          <Avatar name={c.author_snapshot.full_name} src={c.author_snapshot.avatar_url} className="h-8 w-8" />
+          <Avatar
+            name={c.author_snapshot.full_name}
+            src={c.author_snapshot.avatar_url}
+            className="h-8 w-8 border border-slate-300"
+          />
         </UserLink>
         <div className="min-w-0 flex-1">
           <div className="rounded-xl bg-slate-50 px-3 py-2">

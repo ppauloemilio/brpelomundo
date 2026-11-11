@@ -10,6 +10,7 @@ import {
 } from '../lib/settings.js';
 import { paramId } from '../lib/params.js';
 import { deleteAccount } from '../lib/deleteAccount.js';
+import { hydrateUserSnapshot, liveUsersByIds } from '../lib/liveSnapshots.js';
 
 const router = Router();
 
@@ -175,6 +176,8 @@ router.get('/:id/posts', authMiddleware, async (req: AuthRequest, res) => {
 
   const likedSet = new Set(likes.map((l) => l.post_id));
   const authorIsPremium = isPremiumProfile(settings, authorProfile);
+  const liveByAuthor = await liveUsersByIds([id]);
+  const liveAuthor = liveByAuthor.get(id);
 
   res.json(
     posts.map((p) => {
@@ -187,7 +190,10 @@ router.get('/:id/posts', authMiddleware, async (req: AuthRequest, res) => {
         images: parseJson(p.images, []),
         is_promoted: settings.paid_posts_enabled && promotedInDb,
         author_snapshot: {
-          ...parseJson(p.author_snapshot, {}),
+          ...hydrateUserSnapshot(
+            parseJson(p.author_snapshot, {}) as Record<string, unknown>,
+            liveAuthor
+          ),
           is_premium: authorIsPremium,
         },
         author_is_premium: authorIsPremium,

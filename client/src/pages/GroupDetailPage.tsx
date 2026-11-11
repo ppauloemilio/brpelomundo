@@ -145,7 +145,11 @@ export function GroupDetailPage() {
               <Card key={p.id}>
                 <CardContent className="flex gap-3 pt-4">
                   <UserLink userId={p.author_id} className="shrink-0 no-underline">
-                    <Avatar name={p.author_snapshot.full_name} src={p.author_snapshot.avatar_url} className="h-10 w-10" />
+                    <Avatar
+                      name={p.author_snapshot.full_name}
+                      src={p.author_snapshot.avatar_url}
+                      className="h-10 w-10 border border-slate-300"
+                    />
                   </UserLink>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">

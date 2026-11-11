@@ -8,6 +8,7 @@ import {
   isPremiumProfile,
   type MonetizationSettings,
 } from '../lib/settings.js';
+import { hydrateUserSnapshot, liveUsersByIds, type LiveUserFields } from '../lib/liveSnapshots.js';
 import { paramId } from '../lib/params.js';
 
 const router = Router();
@@ -31,7 +32,8 @@ function formatPost(
   settings: MonetizationSettings,
   row: Record<string, unknown>,
   likedByMe = false,
-  authorIsPremium = false
+  authorIsPremium = false,
+  liveAuthor?: LiveUserFields | null
 ) {
   const promotedInDb = !!(row.is_promoted && (
     !row.promoted_until || new Date(row.promoted_until as string) >= new Date()
@@ -51,7 +53,10 @@ function formatPost(
     is_promoted: settings.paid_posts_enabled && promotedInDb,
     comments_enabled: row.comments_enabled !== 0,
     author_is_premium: authorIsPremium,
-    author_snapshot: { ...snapshot, is_premium: authorIsPremium },
+    author_snapshot: {
+      ...hydrateUserSnapshot(snapshot, liveAuthor),
+      is_premium: authorIsPremium,
+    },
     created_at: row.created_at,
     liked_by_me: likedByMe,
   };
@@ -125,7 +130,11 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   ]);
   const likedSet = new Set(likes.map((l) => l.post_id));
 
-  const premiumByAuthor = await authorPremiumMap(settings, posts.map((p) => p.author_id));
+  const authorIds = posts.map((p) => p.author_id);
+  const [premiumByAuthor, liveByAuthor] = await Promise.all([
+    authorPremiumMap(settings, authorIds),
+    liveUsersByIds(authorIds),
+  ]);
 
   res.json({
     posts: posts.map((p) =>
@@ -133,7 +142,8 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
         settings,
         p as Record<string, unknown>,
         likedSet.has(p.id),
-        premiumByAuthor.get(p.author_id) ?? false
+        premiumByAuthor.get(p.author_id) ?? false,
+        liveByAuthor.get(p.author_id)
       )
     ),
     meta: {
@@ -182,7 +192,14 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
 
   const post = await db.get('SELECT * FROM posts WHERE id = ?', [id]);
   const premium = (await authorPremiumMap(settings, [user!.id])).get(user!.id) ?? false;
-  res.status(201).json(formatPost(settings, post as Record<string, unknown>, false, premium));
+  res.status(201).json(
+    formatPost(settings, post as Record<string, unknown>, false, premium, {
+      id: user!.id,
+      username: user!.username,
+      full_name: user!.full_name,
+      avatar_url: user!.avatar_url,
+    })
+  );
 });
 
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
@@ -220,13 +237,22 @@ router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
       id,
     ]);
   }
-  const [updated, settings] = await Promise.all([
+  const [updated, settings, liveByAuthor] = await Promise.all([
     db.get('SELECT * FROM posts WHERE id = ?', [id]),
     getMonetizationSettings(),
+    liveUsersByIds([post.author_id]),
   ]);
   const premium =
     (await authorPremiumMap(settings, [post.author_id])).get(post.author_id) ?? false;
-  res.json(formatPost(settings, updated as Record<string, unknown>, false, premium));
+  res.json(
+    formatPost(
+      settings,
+      updated as Record<string, unknown>,
+      false,
+      premium,
+      liveByAuthor.get(post.author_id)
+    )
+  );
 });
 
 router.post('/:id/like', authMiddleware, async (req: AuthRequest, res) => {
@@ -286,10 +312,14 @@ router.get('/:id/likes', authMiddleware, async (req, res) => {
     'SELECT user_id, user_snapshot, created_at FROM likes WHERE post_id = ? ORDER BY created_at DESC',
     [id]
   );
+  const liveByUser = await liveUsersByIds(rows.map((r) => r.user_id));
   res.json(
     rows.map((r) => ({
       user_id: r.user_id,
-      user_snapshot: parseJson(r.user_snapshot, {}),
+      user_snapshot: hydrateUserSnapshot(
+        parseJson(r.user_snapshot, {}) as Record<string, unknown>,
+        liveByUser.get(r.user_id)
+      ),
       created_at: r.created_at,
     }))
   );
@@ -297,14 +327,18 @@ router.get('/:id/likes', authMiddleware, async (req, res) => {
 
 router.get('/:id/comments', authMiddleware, async (req, res) => {
   const id = paramId(req.params.id);
-  const comments = await db.all<{ author_snapshot: string }>(
+  const comments = await db.all<{ author_id: string; author_snapshot: string }>(
     'SELECT * FROM comments WHERE post_id = ? AND is_active = 1 ORDER BY created_at ASC',
     [id]
   );
+  const liveByAuthor = await liveUsersByIds(comments.map((c) => c.author_id));
   res.json(
     comments.map((c) => ({
       ...c,
-      author_snapshot: parseJson(c.author_snapshot, {}),
+      author_snapshot: hydrateUserSnapshot(
+        parseJson(c.author_snapshot, {}) as Record<string, unknown>,
+        liveByAuthor.get(c.author_id)
+      ),
     }))
   );
 });
@@ -352,13 +386,21 @@ router.post('/:id/comments', authMiddleware, async (req: AuthRequest, res) => {
     await createNotification(notifyUserId, user!.id, 'comment', 'post', post.id);
   }
 
-  const comment = await db.get<{ author_snapshot: string }>(
+  const comment = await db.get<{ author_id: string; author_snapshot: string }>(
     'SELECT * FROM comments WHERE id = ?',
     [commentId]
   );
   res.status(201).json({
     ...comment,
-    author_snapshot: parseJson(comment!.author_snapshot, {}),
+    author_snapshot: hydrateUserSnapshot(
+      parseJson(comment!.author_snapshot, {}) as Record<string, unknown>,
+      {
+        id: user!.id,
+        username: user!.username,
+        full_name: user!.full_name,
+        avatar_url: user!.avatar_url,
+      }
+    ),
   });
 });
 
@@ -381,13 +423,18 @@ router.patch('/:postId/comments/:commentId', authMiddleware, async (req: AuthReq
   }
 
   await db.run('UPDATE comments SET content = ? WHERE id = ?', [trimmed, commentId]);
-  const updated = await db.get<{ author_snapshot: string }>(
-    'SELECT * FROM comments WHERE id = ?',
-    [commentId]
-  );
+  const [updated, liveByAuthor] = await Promise.all([
+    db.get<{ author_id: string; author_snapshot: string }>('SELECT * FROM comments WHERE id = ?', [
+      commentId,
+    ]),
+    liveUsersByIds([comment.author_id]),
+  ]);
   res.json({
     ...updated,
-    author_snapshot: parseJson(updated!.author_snapshot, {}),
+    author_snapshot: hydrateUserSnapshot(
+      parseJson(updated!.author_snapshot, {}) as Record<string, unknown>,
+      liveByAuthor.get(comment.author_id)
+    ),
   });
 });
 

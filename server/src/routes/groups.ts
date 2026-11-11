@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { parseJson, userSnapshot, UserRow } from '../db/database.js';
+import { hydrateUserSnapshot, liveUsersByIds } from '../lib/liveSnapshots.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -181,13 +182,17 @@ router.delete('/:id/join', authMiddleware, async (req: AuthRequest, res) => {
 
 router.get('/:id/posts', authMiddleware, async (req: AuthRequest, res) => {
   const id = paramId(req.params.id);
-  const posts = await db.all<Record<string, unknown> & { author_snapshot: string }>(
+  const posts = await db.all<Record<string, unknown> & { author_id: string; author_snapshot: string }>(
     `SELECT * FROM group_posts WHERE group_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 50`,
     [id]
   );
+  const liveByAuthor = await liveUsersByIds(posts.map((p) => p.author_id));
   res.json(posts.map((p) => ({
     ...p,
-    author_snapshot: parseJson(p.author_snapshot, {}),
+    author_snapshot: hydrateUserSnapshot(
+      parseJson(p.author_snapshot, {}) as Record<string, unknown>,
+      liveByAuthor.get(p.author_id)
+    ),
   })));
 });
 
@@ -227,7 +232,15 @@ router.post('/:id/posts', authMiddleware, async (req: AuthRequest, res) => {
   );
   res.status(201).json({
     ...post,
-    author_snapshot: parseJson(post!.author_snapshot, {}),
+    author_snapshot: hydrateUserSnapshot(
+      parseJson(post!.author_snapshot, {}) as Record<string, unknown>,
+      {
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url,
+      }
+    ),
   });
 });
 
