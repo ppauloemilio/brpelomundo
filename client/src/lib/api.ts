@@ -60,9 +60,19 @@ export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export async function uploadFile(file: File) {
+export async function uploadFile(
+  file: File,
+  opts?: { optimize?: boolean }
+): Promise<{ url: string }> {
+  const optimize = opts?.optimize !== false;
+  let toSend = file;
+  if (optimize && file.type.startsWith('image/')) {
+    const { prepareUploadImage } = await import('@/lib/prepareProfileImage');
+    toSend = await prepareUploadImage(file);
+  }
+
   const form = new FormData();
-  form.append('file', file);
+  form.append('file', toSend);
   const token = getToken();
   const res = await fetch(apiUrl('/api/upload'), {
     method: 'POST',

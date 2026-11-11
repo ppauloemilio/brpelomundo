@@ -110,3 +110,50 @@ export async function prepareCoverImage(file: File, area?: CropAreaPixels): Prom
     { outWidth: COVER_OUT_WIDTH, outHeight: COVER_OUT_HEIGHT, filename: 'cover.jpg' }
   );
 }
+
+const UPLOAD_MAX_EDGE = 1920;
+const UPLOAD_JPEG_QUALITY = 0.85;
+const SKIP_OPTIMIZE_TYPES = new Set(['image/gif', 'image/svg+xml']);
+
+/**
+ * Redimensiona e comprime imagens genéricas (posts, chat, ads).
+ * GIF/SVG e não-imagens passam intactos. Em falha, devolve o original.
+ */
+export async function prepareUploadImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/') || SKIP_OPTIMIZE_TYPES.has(file.type)) {
+    return file;
+  }
+
+  try {
+    const img = await loadImage(file);
+    const edge = Math.max(img.width, img.height);
+    const needsResize = edge > UPLOAD_MAX_EDGE;
+    const alreadyLight =
+      file.type === 'image/jpeg' && !needsResize && file.size <= 400 * 1024;
+    if (alreadyLight) return file;
+
+    let width = img.width;
+    let height = img.height;
+    if (needsResize) {
+      const scale = UPLOAD_MAX_EDGE / edge;
+      width = Math.max(1, Math.round(img.width * scale));
+      height = Math.max(1, Math.round(img.height * scale));
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+
+    ctx.drawImage(img, 0, 0, width, height);
+    const blob = await canvasToBlob(canvas, 'image/jpeg', UPLOAD_JPEG_QUALITY);
+    if (blob.size >= file.size && file.type === 'image/jpeg' && !needsResize) {
+      return file;
+    }
+    const base = file.name.replace(/\.[^.]+$/, '') || 'image';
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+  } catch {
+    return file;
+  }
+}

@@ -266,7 +266,7 @@ export function EditProfilePage() {
       previewUrlsRef.current.push(blobUrl);
       setPreview((p) => ({ ...p, [kind]: blobUrl }));
 
-      const { url } = await uploadFile(prepared);
+      const { url } = await uploadFile(prepared, { optimize: false });
       await persistPhoto(field, url);
       setPreview((p) => {
         const next = { ...p };
