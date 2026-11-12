@@ -10,6 +10,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { legalLinks } from '@/components/legal/LegalFooter';
 
+const cardCls = 'shadow-none';
+const headerCls = 'px-3 py-2 pb-1';
+const titleCls = 'text-sm font-semibold';
+const contentCls = 'px-3 pb-3 pt-1';
+
 export function SettingsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -59,32 +64,75 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
-      <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('settings.account')}</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm">
+    <div className="mx-auto max-w-md space-y-2.5">
+      <h1 className="text-xl font-bold">{t('settings.title')}</h1>
+
+      <Card className={cardCls}>
+        <CardHeader className={headerCls}>
+          <CardTitle className={titleCls}>{t('settings.account')}</CardTitle>
+        </CardHeader>
+        <CardContent className={`${contentCls} space-y-0.5`}>
+          <p className="text-sm leading-snug">
             <strong>{user?.full_name}</strong>
             {user?.is_premium && (
-              <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-800">
+              <span className="ml-2 rounded-full bg-brand-100 px-1.5 py-0.5 text-[11px] font-semibold text-brand-800">
                 Premium
               </span>
             )}
           </p>
-          <p className="text-sm text-slate-500">{user?.email}</p>
+          <p className="text-xs text-slate-500">{user?.email}</p>
           {user?.is_premium && (
-            <p className="text-sm text-brand-700">{t('settings.premiumActive')}</p>
+            <p className="text-xs text-brand-700">{t('settings.premiumActive')}</p>
           )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('settings.changePassword')}</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-3">
+      <Card className={cardCls}>
+        <CardHeader className={headerCls}>
+          <CardTitle className={titleCls}>{t('settings.language')}</CardTitle>
+        </CardHeader>
+        <CardContent className={`${contentCls} flex gap-2`}>
+          <Button
+            size="sm"
+            variant={i18n.language === 'pt-BR' ? 'default' : 'outline'}
+            onClick={() => changeLang('pt-BR')}
+          >
+            Português (BR)
+          </Button>
+          <Button
+            size="sm"
+            variant={i18n.language === 'en' ? 'default' : 'outline'}
+            onClick={() => changeLang('en')}
+          >
+            English
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className={`${cardCls} ${user?.is_premium ? 'border-brand-200 bg-brand-50/40' : ''}`}>
+        <CardContent className="flex items-center gap-2.5 px-3 py-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-900">{t('settings.premiumPlan')}</p>
+            <p className="text-xs leading-snug text-slate-600">{t('settings.premiumBenefits')}</p>
+          </div>
+          <Button size="sm" className="shrink-0" onClick={() => navigate('/pricing')}>
+            <CreditCard className="h-3.5 w-3.5" />
+            {user?.is_premium ? t('settings.manageBilling') : t('settings.upgradePremium')}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className={cardCls}>
+        <CardHeader className={headerCls}>
+          <CardTitle className={titleCls}>{t('settings.changePassword')}</CardTitle>
+        </CardHeader>
+        <CardContent className={contentCls}>
+          <form onSubmit={handleChangePassword} className="space-y-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-0.5 block text-xs font-medium text-slate-700">
                 {t('settings.currentPassword')}
               </label>
               <Input
@@ -93,10 +141,11 @@ export function SettingsPage() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
+                className="h-9 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-0.5 block text-xs font-medium text-slate-700">
                 {t('settings.newPassword')}
               </label>
               <Input
@@ -105,10 +154,11 @@ export function SettingsPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
+                className="h-9 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-0.5 block text-xs font-medium text-slate-700">
                 {t('settings.confirmPassword')}
               </label>
               <Input
@@ -117,84 +167,66 @@ export function SettingsPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                className="h-9 text-sm"
               />
             </div>
-            {pwdError && <p className="text-sm text-red-600">{pwdError}</p>}
-            {pwdOk && <p className="text-sm text-emerald-700">{t('settings.passwordChanged')}</p>}
-            <Button type="submit" disabled={pwdLoading}>
+            {pwdError && <p className="text-xs text-red-600">{pwdError}</p>}
+            {pwdOk && <p className="text-xs text-emerald-700">{t('settings.passwordChanged')}</p>}
+            <Button type="submit" size="sm" disabled={pwdLoading}>
               {pwdLoading ? t('common.loading') : t('settings.savePassword')}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card className={user?.is_premium ? 'border-brand-200 bg-brand-50/40' : ''}>
-        <CardContent className="flex items-start gap-3 pt-6">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-            <Sparkles className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-slate-900">{t('settings.premiumPlan')}</p>
-            <p className="mt-1 text-sm text-slate-600">{t('settings.premiumBenefits')}</p>
-            <Button size="sm" className="mt-3" onClick={() => navigate('/pricing')}>
-              <CreditCard className="h-4 w-4" />
-              {user?.is_premium ? t('settings.manageBilling') : t('settings.upgradePremium')}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {user?.is_admin && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">{t('settings.administration')}</CardTitle></CardHeader>
-          <CardContent>
+        <Card className={cardCls}>
+          <CardHeader className={headerCls}>
+            <CardTitle className={titleCls}>{t('settings.administration')}</CardTitle>
+          </CardHeader>
+          <CardContent className={contentCls}>
             <button
               type="button"
               onClick={() => navigate('/admin')}
-              className="flex w-full items-center gap-3 rounded-xl border border-brand-200 bg-brand-50/50 px-4 py-3 text-left transition-colors hover:bg-brand-50"
+              className="flex w-full items-center gap-2.5 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 text-left transition-colors hover:bg-brand-50"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-                <Shield className="h-5 w-5" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                <Shield className="h-4 w-4" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-medium text-slate-900">{t('nav.admin')}</span>
-                <span className="block text-sm text-slate-500">{t('settings.adminHint')}</span>
+                <span className="block text-sm font-medium text-slate-900">{t('nav.admin')}</span>
+                <span className="block text-xs text-slate-500">{t('settings.adminHint')}</span>
               </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
             </button>
           </CardContent>
         </Card>
       )}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('settings.legal')}</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-slate-500">{t('settings.legalHint')}</p>
+
+      <Card className={cardCls}>
+        <CardHeader className={headerCls}>
+          <CardTitle className={titleCls}>{t('settings.legal')}</CardTitle>
+        </CardHeader>
+        <CardContent className={`${contentCls} space-y-1`}>
+          <p className="text-xs text-slate-500">{t('settings.legalHint')}</p>
           <div className="flex flex-col">
             {legalLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
-                className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                className="flex items-center justify-between rounded-md px-1.5 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50"
               >
                 {t(link.labelKey)}
-                <ChevronRight className="h-4 w-4 text-slate-400" />
+                <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
               </Link>
             ))}
           </div>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('settings.language')}</CardTitle></CardHeader>
-        <CardContent className="flex gap-2">
-          <Button variant={i18n.language === 'pt-BR' ? 'default' : 'outline'} onClick={() => changeLang('pt-BR')}>
-            Português (BR)
-          </Button>
-          <Button variant={i18n.language === 'en' ? 'default' : 'outline'} onClick={() => changeLang('en')}>
-            English
-          </Button>
-        </CardContent>
-      </Card>
-      <Button variant="destructive" onClick={logout}>{t('nav.logout')}</Button>
+
+      <Button variant="destructive" size="sm" onClick={logout}>
+        {t('nav.logout')}
+      </Button>
     </div>
   );
 }
