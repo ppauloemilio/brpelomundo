@@ -3,6 +3,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { v4 as uuid } from 'uuid';
 import { put } from '@vercel/blob';
+import { assertAllowedUpload, safeImageExtension } from './uploadSecurity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,7 +43,9 @@ export type UploadedFile = {
 
 /** Grava o arquivo e devolve a URL pública a ser persistida no banco. */
 export async function saveUpload(file: UploadedFile): Promise<string> {
-  const filename = `${uuid()}${path.extname(file.originalname)}`;
+  assertAllowedUpload(file);
+  // Extensão vem do MIME validado — não do nome enviado pelo cliente.
+  const filename = `${uuid()}${safeImageExtension(file.mimetype)}`;
 
   if (blobEnabled) {
     // Sem repassar credenciais: o SDK lê o OIDC (rotacionado pela Vercel) ou o

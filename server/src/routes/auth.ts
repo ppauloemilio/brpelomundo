@@ -8,10 +8,11 @@ import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
 import { TERMS_VERSION } from '../lib/terms.js';
 import { issueEmailVerification } from '../lib/emailVerification.js';
 import { issuePasswordReset } from '../lib/passwordReset.js';
+import { authEmailLimiter, authStrictLimiter } from '../lib/rateLimit.js';
 
 const router = Router();
 
-router.post('/register', async (req, res) => {
+router.post('/register', authStrictLimiter, async (req, res) => {
   const { email, password, username, full_name, country = 'BR', terms_accepted } = req.body;
   if (!email || !password || !username || !full_name) {
     return res.status(400).json({ error: 'Preencha todos os campos obrigatórios' });
@@ -51,7 +52,7 @@ router.post('/register', async (req, res) => {
   res.status(201).json({ pending_verification: true, email });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authStrictLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email e senha obrigatórios' });
 
@@ -73,7 +74,7 @@ router.post('/login', async (req, res) => {
   res.json({ token: signToken(found.id), user: publicUser(found) });
 });
 
-router.post('/verify-email', async (req, res) => {
+router.post('/verify-email', authStrictLimiter, async (req, res) => {
   const token = String(req.body?.token || '');
   if (!token) return res.status(400).json({ error: 'Link inválido' });
 
@@ -107,7 +108,7 @@ router.post('/verify-email', async (req, res) => {
   res.json({ token: signToken(fresh!.id), user: publicUser(fresh!) });
 });
 
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', authEmailLimiter, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   if (email) {
     const user = await db.get<UserRow>(
@@ -125,7 +126,7 @@ router.post('/resend-verification', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authEmailLimiter, async (req, res) => {
   const email = String(req.body?.email || '').trim();
   if (email) {
     const user = await db.get<UserRow>(
@@ -207,7 +208,7 @@ router.get('/invite/:token', async (req, res) => {
   res.json({ email: invite.email, full_name: invite.full_name });
 });
 
-router.post('/setup-password', async (req, res) => {
+router.post('/setup-password', authStrictLimiter, async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password || String(password).length < 6) {
     return res.status(400).json({ error: 'Token e senha (mín. 6 caracteres) são obrigatórios' });

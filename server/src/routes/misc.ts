@@ -5,10 +5,16 @@ import { parseJson } from '../db/database.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { saveUpload, UploadNotConfiguredError } from '../lib/uploads.js';
 import { getMonetizationSettings, isPremiumProfile } from '../lib/settings.js';
+import { isAllowedImageMime } from '../lib/uploadSecurity.js';
+import { uploadLimiter } from '../lib/rateLimit.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (isAllowedImageMime(file.mimetype)) cb(null, true);
+    else cb(new Error('Formato inválido. Use JPG, PNG, WebP ou GIF.'));
+  },
 });
 
 const router = Router();
@@ -280,7 +286,16 @@ router.get('/feed/sidebar', authMiddleware, async (req: AuthRequest, res) => {
   });
 });
 
-router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
+router.post('/upload', authMiddleware, uploadLimiter, (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      const msg = err instanceof Error ? err.message : 'Upload inválido';
+      const status = /formato|inválido|file too large|File too large/i.test(msg) ? 400 : 400;
+      return res.status(status).json({ error: msg });
+    }
+    next();
+  });
+}, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Arquivo obrigatório' });
   try {
     const url = await saveUpload(req.file);
@@ -289,8 +304,10 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req, res) =
     if (err instanceof UploadNotConfiguredError) {
       return res.status(503).json({ error: err.message });
     }
-    // Falha do armazenamento, não do app: o motivo (ex.: store privado, cota)
-    // é acionável para quem administra, e some nos logs se não for devolvido.
+    const status = (err as { status?: number }).status;
+    if (status === 400) {
+      return res.status(400).json({ error: err instanceof Error ? err.message : 'Upload inválido' });
+    }
     const reason = err instanceof Error ? err.message : 'erro desconhecido';
     console.error('Falha ao enviar imagem para o Blob:', err);
     res.status(502).json({ error: `Falha ao salvar a imagem: ${reason}` });

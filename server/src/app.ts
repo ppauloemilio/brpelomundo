@@ -1,6 +1,8 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { uploadsDir, blobEnabled } from './lib/uploads.js';
+import { apiGeneralLimiter } from './lib/rateLimit.js';
 import authRoutes from './routes/auth.js';
 import postsRoutes from './routes/posts.js';
 import usersRoutes from './routes/users.js';
@@ -23,29 +25,54 @@ const schemaReady = migrateSchema().catch((err) => {
   console.error('Falha na migração do schema:', err);
 });
 
-/** Origens permitidas (APP_URL e/ou CORS_ORIGIN separados por vírgula). Sem isso, libera tudo. */
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+}
+
+/** Origens permitidas (APP_URL e/ou CORS_ORIGIN separados por vírgula). */
 function resolveCorsOrigin(): boolean | string | string[] {
   const listed = [
     ...(process.env.CORS_ORIGIN?.split(',') ?? []),
     process.env.APP_URL ?? '',
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
   ]
     // A barra final quebraria a comparação: o header Origin nunca a inclui.
     .map((s) => s.trim().replace(/\/+$/, ''))
     .filter(Boolean);
-  if (listed.length === 0) return true;
-  return listed.length === 1 ? listed[0] : listed;
+
+  const unique = [...new Set(listed)];
+  if (unique.length === 0) {
+    if (isProductionRuntime()) {
+      console.warn('[security] Nenhuma origem CORS configurada em produção — bloqueando cross-origin.');
+      return [];
+    }
+    return true;
+  }
+  return unique.length === 1 ? unique[0]! : unique;
 }
 
 export function createApp() {
   const app = express();
+
+  // Necessário na Vercel/proxies para rate limit e IPs reais.
+  app.set('trust proxy', 1);
 
   app.use(async (_req, _res, next) => {
     await schemaReady;
     next();
   });
 
+  app.use(
+    helmet({
+      // Front e API em domínios diferentes; imagens no Blob/CDN.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: false,
+    })
+  );
+
   app.use(cors({ origin: resolveCorsOrigin(), credentials: true }));
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
+  app.use('/api', apiGeneralLimiter);
 
   // Em produção os uploads vão para o Vercel Blob e são servidos pela CDN.
   if (!blobEnabled) {

@@ -16,8 +16,13 @@ import {
   updateAdCampaignCreative,
 } from '../lib/billing.js';
 import { getUsdBrlRate } from '../lib/fx.js';
-import { mercadopagoConfigured } from '../lib/mercadopago.js';
+import {
+  getMercadoPagoWebhookSecret,
+  mercadopagoConfigured,
+  verifyMercadoPagoWebhookSignature,
+} from '../lib/mercadopago.js';
 import { paramId } from '../lib/params.js';
+import { adEventsLimiter, webhookLimiter } from '../lib/rateLimit.js';
 
 const router = Router();
 
@@ -242,15 +247,54 @@ async function handleMercadoPagoWebhook(req: AuthRequest, res: import('express')
     return res.status(503).json({ error: 'Mercado Pago não configurado' });
   }
 
-  let paymentId: string | undefined;
   const body = req.body as { type?: string; action?: string; data?: { id?: string | number } };
+  const dataIdFromQuery =
+    typeof req.query['data.id'] === 'string'
+      ? req.query['data.id']
+      : typeof req.query.id === 'string'
+        ? req.query.id
+        : undefined;
+  const dataIdFromBody = body?.data?.id != null ? String(body.data.id) : undefined;
+  const dataId = dataIdFromQuery || dataIdFromBody;
+
+  const secret = getMercadoPagoWebhookSecret();
+  const hasSignatureHeader = typeof req.headers['x-signature'] === 'string';
+  // Em produção com secret configurado (ou se o MP mandou assinatura), exige validação.
+  if (secret) {
+    const checked = verifyMercadoPagoWebhookSignature({
+      xSignature: typeof req.headers['x-signature'] === 'string' ? req.headers['x-signature'] : undefined,
+      xRequestId:
+        typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined,
+      dataId,
+    });
+    if (!checked.ok) {
+      console.warn('[mp-webhook] assinatura rejeitada:', checked.reason);
+      return res.status(401).json({ error: 'Assinatura inválida' });
+    }
+  } else if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    console.warn(
+      '[mp-webhook] MERCADOPAGO_WEBHOOK_SECRET ausente — configure a Secret Signature do painel Webhooks do MP'
+    );
+    // Sem secret ainda aceita (compatível com setup atual), mas exige POST com type payment
+    // e sempre confirma na API do MP antes de ativar plano.
+    if (hasSignatureHeader) {
+      return res.status(401).json({
+        error: 'Configure MERCADOPAGO_WEBHOOK_SECRET para validar assinaturas',
+      });
+    }
+  }
+
+  let paymentId: string | undefined;
   if (body?.type === 'payment' && body.data?.id != null) {
     paymentId = String(body.data.id);
   }
   if (!paymentId) {
     const topic = typeof req.query.topic === 'string' ? req.query.topic : '';
     const id = typeof req.query.id === 'string' ? req.query.id : '';
-    if (topic === 'payment' && id) paymentId = id;
+    if ((topic === 'payment' || req.query.type === 'payment') && id) paymentId = id;
+  }
+  if (!paymentId && dataId && (body?.type === 'payment' || req.query.type === 'payment')) {
+    paymentId = dataId;
   }
 
   if (!paymentId) {
@@ -266,11 +310,11 @@ async function handleMercadoPagoWebhook(req: AuthRequest, res: import('express')
   }
 }
 
-router.post('/webhooks/mercadopago', handleMercadoPagoWebhook);
-router.get('/webhooks/mercadopago', handleMercadoPagoWebhook);
+router.post('/webhooks/mercadopago', webhookLimiter, handleMercadoPagoWebhook);
+router.get('/webhooks/mercadopago', webhookLimiter, handleMercadoPagoWebhook);
 
 /** Public-ish ad event tracking (auth optional) */
-router.post('/ads/:id/events', optionalAuth, async (req: AuthRequest, res) => {
+router.post('/ads/:id/events', adEventsLimiter, optionalAuth, async (req: AuthRequest, res) => {
   const adId = paramId(req.params.id);
   const eventType = (req.body.event_type as string) || '';
   const placement = (req.body.placement as string) || 'feed';

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import QRCode from 'qrcode';
 
 type MercadoPagoPaymentResponse = {
@@ -162,4 +163,63 @@ export async function fetchMercadoPagoPayment(paymentId: string): Promise<Mercad
   }
 
   return (await response.json()) as MercadoPagoPaymentResponse;
+}
+
+export function getMercadoPagoWebhookSecret(): string {
+  return normalizeEnv(process.env.MERCADOPAGO_WEBHOOK_SECRET);
+}
+
+/**
+ * Valida x-signature do webhook (HMAC-SHA256).
+ * Docs MP: manifest `id:{data.id};request-id:{x-request-id};ts:{ts};`
+ * data.id alfanumérico deve ir em minúsculas.
+ */
+export function verifyMercadoPagoWebhookSignature(opts: {
+  xSignature: string | undefined;
+  xRequestId: string | undefined;
+  dataId: string | undefined;
+}): { ok: true } | { ok: false; reason: string } {
+  const secret = getMercadoPagoWebhookSecret();
+  if (!secret) {
+    return { ok: false, reason: 'MERCADOPAGO_WEBHOOK_SECRET não configurado' };
+  }
+  if (!opts.xSignature || !opts.xRequestId || !opts.dataId) {
+    return { ok: false, reason: 'Cabeçalhos/assinatura incompletos' };
+  }
+
+  const parts = Object.fromEntries(
+    opts.xSignature.split(',').map((p) => {
+      const idx = p.indexOf('=');
+      if (idx === -1) return [p.trim(), ''];
+      return [p.slice(0, idx).trim(), p.slice(idx + 1).trim()];
+    })
+  );
+  const ts = parts.ts;
+  const v1 = parts.v1;
+  if (!ts || !v1) return { ok: false, reason: 'x-signature sem ts/v1' };
+
+  // Rejeita timestamps muito antigos/futuros (~5 min).
+  const tsNum = Number(ts);
+  if (Number.isFinite(tsNum)) {
+    const ageSec = Math.abs(Date.now() / 1000 - (tsNum > 1e12 ? tsNum / 1000 : tsNum));
+    if (ageSec > 300) return { ok: false, reason: 'Assinatura expirada' };
+  }
+
+  let dataId = String(opts.dataId);
+  if (/^[a-zA-Z0-9]+$/.test(dataId)) dataId = dataId.toLowerCase();
+
+  const manifest = `id:${dataId};request-id:${opts.xRequestId};ts:${ts};`;
+  const expected = crypto.createHmac('sha256', secret).update(manifest).digest('hex');
+
+  try {
+    const a = Buffer.from(expected, 'utf8');
+    const b = Buffer.from(v1, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return { ok: false, reason: 'Assinatura inválida' };
+    }
+  } catch {
+    return { ok: false, reason: 'Assinatura inválida' };
+  }
+
+  return { ok: true };
 }

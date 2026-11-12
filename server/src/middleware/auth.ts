@@ -3,20 +3,19 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuid } from 'uuid';
 import { db } from '../db/sql.js';
 import { publicUser, UserRow } from '../db/database.js';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'comunidade-br-dev-secret-change-in-production';
+import { getJwtSecret } from '../lib/jwtSecret.js';
 
 export interface AuthRequest extends Request {
   user?: ReturnType<typeof publicUser>;
 }
 
 export function signToken(userId: string) {
-  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ sub: userId }, getJwtSecret(), { expiresIn: '30d' });
 }
 
 async function userFromHeader(header: string | undefined): Promise<UserRow | undefined> {
   if (!header?.startsWith('Bearer ')) return undefined;
-  const payload = jwt.verify(header.slice(7), JWT_SECRET) as { sub: string };
+  const payload = jwt.verify(header.slice(7), getJwtSecret()) as { sub: string };
   return db.get<UserRow>('SELECT * FROM users WHERE id = ?', [payload.sub]);
 }
 
@@ -31,6 +30,9 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     return res.status(401).json({ error: 'Token inválido' });
   }
   if (!user) return res.status(401).json({ error: 'Usuário não encontrado' });
+  if (user.is_active === 0) {
+    return res.status(403).json({ error: 'Conta desativada. Entre em contato com o suporte.' });
+  }
   req.user = publicUser(user);
   next();
 }
@@ -38,7 +40,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 export async function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const user = await userFromHeader(req.headers.authorization);
-    if (user) req.user = publicUser(user);
+    if (user && user.is_active !== 0) req.user = publicUser(user);
   } catch { /* segue sem usuário */ }
   next();
 }
