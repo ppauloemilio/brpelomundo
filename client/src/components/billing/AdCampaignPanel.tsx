@@ -5,6 +5,7 @@ import { ImagePlus, Megaphone } from 'lucide-react';
 import { api, assetUrl, uploadFile } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 import {
@@ -133,41 +134,48 @@ function CampaignEditor({
       )}
 
       <div className="space-y-3">
-        <Input
-          placeholder={t('billing.adTitle')}
-          value={form.title}
-          onChange={(e) => {
-            setSaved(false);
-            setForm({ ...form, title: e.target.value });
-          }}
-        />
-        <div className="flex flex-wrap items-center gap-3">
-          {form.image_url ? (
-            <img
-              src={assetUrl(form.image_url) ?? form.image_url}
-              alt=""
-              className={previewClass}
-            />
-          ) : (
-            <div
-              className={cn(
-                'flex items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-400',
-                placement === 'feed' ? 'h-16 w-40' : 'h-16 w-28'
-              )}
-            >
-              <ImagePlus className="h-6 w-6" />
-            </div>
-          )}
-          <label className="cursor-pointer text-sm font-medium text-brand-700 hover:text-brand-800">
-            {uploading ? t('common.loading') : t('billing.adUploadImage')}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={uploading}
-              onChange={(e) => e.target.files?.[0] && handleImage(e.target.files[0])}
-            />
-          </label>
+        <div>
+          <FieldLabel className="mb-1 block" required>{t('billing.adTitle')}</FieldLabel>
+          <Input
+            placeholder={t('billing.adTitle')}
+            value={form.title}
+            onChange={(e) => {
+              setSaved(false);
+              setForm({ ...form, title: e.target.value });
+            }}
+            required
+          />
+        </div>
+        <div>
+          <FieldLabel className="mb-1 block" required>{t('billing.adImage')}</FieldLabel>
+          <div className="flex flex-wrap items-center gap-3">
+            {form.image_url ? (
+              <img
+                src={assetUrl(form.image_url) ?? form.image_url}
+                alt=""
+                className={previewClass}
+              />
+            ) : (
+              <div
+                className={cn(
+                  'flex items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-slate-400',
+                  placement === 'feed' ? 'h-16 w-40' : 'h-16 w-28'
+                )}
+              >
+                <ImagePlus className="h-6 w-6" />
+              </div>
+            )}
+            <label className="cursor-pointer text-sm font-medium text-brand-700 hover:text-brand-800">
+              {uploading ? t('common.loading') : t('billing.adUploadImage')}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => e.target.files?.[0] && handleImage(e.target.files[0])}
+              />
+            </label>
+          </div>
         </div>
         <Input
           placeholder={t('billing.adLink')}

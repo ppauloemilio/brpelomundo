@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { FieldLabel, RequiredMark } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { UserLink } from '@/components/ui/UserLink';
@@ -292,56 +293,81 @@ export function ClassifiedsPage() {
       {showCreate && (
         <Card>
           <CardContent className="space-y-3 pt-5">
-            <Input
-              placeholder={t('classifieds.listingTitle')}
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
-            <Textarea
-              placeholder={t('classifieds.description')}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
+            <div>
+              <FieldLabel className="mb-1 block" required>{t('classifieds.listingTitle')}</FieldLabel>
+              <Input
+                placeholder={t('classifieds.listingTitle')}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <FieldLabel className="mb-1 block">{t('classifieds.description')}</FieldLabel>
+              <Textarea
+                placeholder={t('classifieds.description')}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <select
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{t(`classifieds.category.${c}`)}</option>
-                ))}
-              </select>
-              <select
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                value={form.condition_label}
-                onChange={(e) => setForm({ ...form, condition_label: e.target.value })}
-              >
-                {['new', 'like_new', 'used'].map((c) => (
-                  <option key={c} value={c}>{t(`classifieds.condition.${c}`)}</option>
-                ))}
-              </select>
-              <Input
-                type="number"
-                placeholder={t('classifieds.price')}
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-              />
-              <Input
-                placeholder={t('classifieds.currency')}
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-              />
-              <Input
-                placeholder={t('classifieds.city')}
-                value={form.city}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
-              />
-              <Input
-                placeholder="WhatsApp"
-                value={form.contact_whatsapp}
-                onChange={(e) => setForm({ ...form, contact_whatsapp: e.target.value })}
-              />
+              <div>
+                <FieldLabel className="mb-1 block">{t('classifieds.categoryLabel')}</FieldLabel>
+                <select
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{t(`classifieds.category.${c}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block">{t('classifieds.conditionLabel')}</FieldLabel>
+                <select
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
+                  value={form.condition_label}
+                  onChange={(e) => setForm({ ...form, condition_label: e.target.value })}
+                >
+                  {['new', 'like_new', 'used'].map((c) => (
+                    <option key={c} value={c}>{t(`classifieds.condition.${c}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block">{t('classifieds.price')}</FieldLabel>
+                <Input
+                  type="number"
+                  placeholder={t('classifieds.price')}
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                />
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block">{t('classifieds.currency')}</FieldLabel>
+                <Input
+                  placeholder={t('classifieds.currency')}
+                  value={form.currency}
+                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                />
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block">{t('classifieds.city')}</FieldLabel>
+                <Input
+                  placeholder={t('classifieds.city')}
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                />
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block">WhatsApp</FieldLabel>
+                <Input
+                  placeholder="WhatsApp"
+                  value={form.contact_whatsapp}
+                  onChange={(e) => setForm({ ...form, contact_whatsapp: e.target.value })}
+                />
+              </div>
             </div>
             <label className="flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-700">
               <input
@@ -349,8 +375,12 @@ export function ClassifiedsPage() {
                 checked={declareAccurate}
                 onChange={(e) => setDeclareAccurate(e.target.checked)}
                 className="mt-1 h-4 w-4 shrink-0 accent-brand-700"
+                required
               />
-              <span>{t('classifieds.declareAccurate')}</span>
+              <span>
+                {t('classifieds.declareAccurate')}
+                <RequiredMark />
+              </span>
             </label>
             {createError && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

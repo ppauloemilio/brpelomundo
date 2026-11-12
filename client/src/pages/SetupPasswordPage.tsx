@@ -6,6 +6,7 @@ import { api, setToken } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 
 export function SetupPasswordPage() {
@@ -67,12 +68,12 @@ export function SetupPasswordPage() {
           <p className="text-sm text-slate-600">{t('setupPassword.greetingReset', { name: invite.full_name })}</p>
           <p className="text-sm text-slate-500">{invite.email}</p>
           <div>
-            <label className="mb-1 block text-sm font-medium">{t('auth.password')}</label>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <FieldLabel className="mb-1 block" required>{t('auth.password')}</FieldLabel>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">{t('setupPassword.confirm')}</label>
-            <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <FieldLabel className="mb-1 block" required>{t('setupPassword.confirm')}</FieldLabel>
+            <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
           </div>
           <Button className="w-full" disabled={!canSubmit || mutation.isPending} onClick={() => mutation.mutate()}>
             {mutation.isPending ? t('common.loading') : t('setupPassword.submit')}

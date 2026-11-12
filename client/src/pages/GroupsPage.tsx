@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { COUNTRY_LABELS, cn } from '@/lib/utils';
 
@@ -73,31 +74,46 @@ export function GroupsPage() {
       {showCreate && (
         <Card>
           <CardContent className="space-y-3 pt-5">
-            <Input
-              placeholder={t('groups.name')}
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-            <Input
-              placeholder={t('groups.description')}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <FieldLabel className="mb-1 block" required>{t('groups.name')}</FieldLabel>
               <Input
-                placeholder={t('groups.city')}
-                value={form.city}
-                onChange={(e) => setForm({ ...form, city: e.target.value })}
+                placeholder={t('groups.name')}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
               />
-              <select
-                className="flex h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
-                value={form.country}
-                onChange={(e) => setForm({ ...form, country: e.target.value })}
-              >
-                {Object.entries(COUNTRY_LABELS).filter(([c]) => c !== 'BR').map(([code, label]) => (
-                  <option key={code} value={code}>{label}</option>
-                ))}
-              </select>
+            </div>
+            <div>
+              <FieldLabel className="mb-1 block">{t('groups.description')}</FieldLabel>
+              <Input
+                placeholder={t('groups.description')}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <FieldLabel className="mb-1 block" required>{t('groups.city')}</FieldLabel>
+                <Input
+                  placeholder={t('groups.city')}
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block" required>{t('groups.country')}</FieldLabel>
+                <select
+                  className="flex h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
+                  value={form.country}
+                  onChange={(e) => setForm({ ...form, country: e.target.value })}
+                  required
+                >
+                  {Object.entries(COUNTRY_LABELS).filter(([c]) => c !== 'BR').map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>

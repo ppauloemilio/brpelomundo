@@ -7,6 +7,7 @@ import { api, uploadFile } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { PostFormatToolbar } from '@/components/post/PostFormatToolbar';
 import { PostImageControls } from '@/components/post/PostImageControls';
@@ -165,6 +166,7 @@ export function CreatePostPage() {
           </select>
 
           <div className="space-y-2">
+            <FieldLabel required>{t('post.content')}</FieldLabel>
             <PostFormatToolbar
               value={content}
               onChange={setContent}
@@ -175,6 +177,7 @@ export function CreatePostPage() {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder={t('post.placeholder')}
+              required
               className="min-h-[200px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm leading-relaxed outline-none ring-brand-500/30 focus:ring-2"
             />
             {content.trim() && (

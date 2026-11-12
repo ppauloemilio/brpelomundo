@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ImageCropDialog } from '@/components/profile/ImageCropDialog';
@@ -385,22 +386,22 @@ export function EditProfilePage() {
             <>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium">{t('editProfile.username')}</label>
-                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+                  <FieldLabel className="mb-1 block" required>{t('editProfile.username')}</FieldLabel>
+                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium">{t('editProfile.displayName')}</label>
-                  <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+                  <FieldLabel className="mb-1 block" required>{t('editProfile.displayName')}</FieldLabel>
+                  <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">{t('profile.bio')}</label>
+                <FieldLabel className="mb-1 block">{t('profile.bio')}</FieldLabel>
                 <Textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} className="min-h-[120px]" />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">{t('editProfile.primaryArea')}</label>
+                <FieldLabel className="mb-1 block">{t('editProfile.primaryArea')}</FieldLabel>
                 <select
                   className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"
                   value={form.primary_skill}
@@ -412,7 +413,7 @@ export function EditProfilePage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">{t('editProfile.languages')}</label>
+                <FieldLabel className="mb-1 block">{t('editProfile.languages')}</FieldLabel>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {form.languages.map((lang) => (
                     <span key={lang} className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-3 py-1 text-sm text-brand-800">

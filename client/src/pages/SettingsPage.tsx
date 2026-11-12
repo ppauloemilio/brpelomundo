@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { legalLinks } from '@/components/legal/LegalFooter';
 
 const cardCls = 'shadow-none';
@@ -132,9 +133,9 @@ export function SettingsPage() {
         <CardContent className={contentCls}>
           <form onSubmit={handleChangePassword} className="space-y-2">
             <div>
-              <label className="mb-0.5 block text-xs font-medium text-slate-700">
+              <FieldLabel className="mb-0.5 block text-xs" required>
                 {t('settings.currentPassword')}
-              </label>
+              </FieldLabel>
               <Input
                 type="password"
                 autoComplete="current-password"
@@ -145,9 +146,9 @@ export function SettingsPage() {
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-xs font-medium text-slate-700">
+              <FieldLabel className="mb-0.5 block text-xs" required>
                 {t('settings.newPassword')}
-              </label>
+              </FieldLabel>
               <Input
                 type="password"
                 autoComplete="new-password"
@@ -158,9 +159,9 @@ export function SettingsPage() {
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-xs font-medium text-slate-700">
+              <FieldLabel className="mb-0.5 block text-xs" required>
                 {t('settings.confirmPassword')}
-              </label>
+              </FieldLabel>
               <Input
                 type="password"
                 autoComplete="new-password"

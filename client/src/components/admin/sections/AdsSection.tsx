@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, assetUrl, uploadFile } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 
 type Ad = {
@@ -53,10 +54,19 @@ export function AdsSection() {
       <Card>
         <CardContent className="space-y-3 pt-6">
           <h2 className="font-semibold">{t('admin.newAd')}</h2>
-          <Input placeholder={t('admin.adTitle')} value={adForm.title} onChange={(e) => setAdForm({ ...adForm, title: e.target.value })} />
-          <Input placeholder="URL da imagem" value={adForm.image_url} onChange={(e) => setAdForm({ ...adForm, image_url: e.target.value })} />
-          <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleAdImage(e.target.files[0])} />
-          <Input placeholder={t('admin.adLink')} value={adForm.link_url} onChange={(e) => setAdForm({ ...adForm, link_url: e.target.value })} />
+          <div>
+            <FieldLabel className="mb-1 block" required>{t('admin.adTitle')}</FieldLabel>
+            <Input placeholder={t('admin.adTitle')} value={adForm.title} onChange={(e) => setAdForm({ ...adForm, title: e.target.value })} required />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block" required>{t('billing.adImage')}</FieldLabel>
+            <Input placeholder="URL da imagem" value={adForm.image_url} onChange={(e) => setAdForm({ ...adForm, image_url: e.target.value })} required />
+            <input className="mt-2 block text-sm" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleAdImage(e.target.files[0])} />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block">{t('admin.adLink')}</FieldLabel>
+            <Input placeholder={t('admin.adLink')} value={adForm.link_url} onChange={(e) => setAdForm({ ...adForm, link_url: e.target.value })} />
+          </div>
           <Button onClick={() => createAd.mutate()} disabled={!adForm.title || !adForm.image_url || createAd.isPending}>
             {t('admin.createAd')}
           </Button>

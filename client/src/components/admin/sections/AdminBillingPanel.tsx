@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { groupPlans } from '@/lib/planGroups';
 
@@ -169,16 +170,23 @@ export function AdminBillingPanel() {
             <p className="text-xs text-slate-500">{t('admin.promotionsHint')}</p>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Input
-              placeholder={t('admin.promoCode')}
-              value={promoForm.code}
-              onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
-            />
-            <Input
-              placeholder={t('admin.promoLabel')}
-              value={promoForm.label}
-              onChange={(e) => setPromoForm({ ...promoForm, label: e.target.value })}
-            />
+            <div>
+              <FieldLabel className="mb-1 block" required>{t('admin.promoCode')}</FieldLabel>
+              <Input
+                placeholder={t('admin.promoCode')}
+                value={promoForm.code}
+                onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })}
+                required
+              />
+            </div>
+            <div>
+              <FieldLabel className="mb-1 block">{t('admin.promoLabel')}</FieldLabel>
+              <Input
+                placeholder={t('admin.promoLabel')}
+                value={promoForm.label}
+                onChange={(e) => setPromoForm({ ...promoForm, label: e.target.value })}
+              />
+            </div>
             <select
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
               value={promoForm.plan_id}
@@ -259,31 +267,45 @@ export function AdminBillingPanel() {
             <h3 className="font-semibold text-slate-900">{t('admin.grantTitle')}</h3>
             <p className="text-xs text-slate-500">{t('admin.grantHint')}</p>
           </div>
-          <Input
-            placeholder={t('admin.grantEmail')}
-            value={grant.email}
-            onChange={(e) => { setGrant({ ...grant, email: e.target.value }); setGrantMsg(null); }}
-          />
-          <select
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            value={grant.plan_code}
-            onChange={(e) => setGrant({ ...grant, plan_code: e.target.value })}
-          >
-            {plans.map((p) => (
-              <option key={p.code} value={p.code}>{p.name}</option>
-            ))}
-          </select>
-          <Input
-            type="number"
-            placeholder={t('admin.grantDays')}
-            value={grant.duration_days}
-            onChange={(e) => setGrant({ ...grant, duration_days: e.target.value })}
-          />
-          <Input
-            placeholder={t('admin.grantNote')}
-            value={grant.note}
-            onChange={(e) => setGrant({ ...grant, note: e.target.value })}
-          />
+          <div>
+            <FieldLabel className="mb-1 block" required>{t('admin.grantEmail')}</FieldLabel>
+            <Input
+              placeholder={t('admin.grantEmail')}
+              value={grant.email}
+              onChange={(e) => { setGrant({ ...grant, email: e.target.value }); setGrantMsg(null); }}
+              required
+            />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block" required>{t('admin.grantPlan')}</FieldLabel>
+            <select
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={grant.plan_code}
+              onChange={(e) => setGrant({ ...grant, plan_code: e.target.value })}
+              required
+            >
+              {plans.map((p) => (
+                <option key={p.code} value={p.code}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block">{t('admin.grantDays')}</FieldLabel>
+            <Input
+              type="number"
+              placeholder={t('admin.grantDays')}
+              value={grant.duration_days}
+              onChange={(e) => setGrant({ ...grant, duration_days: e.target.value })}
+            />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block">{t('admin.grantNote')}</FieldLabel>
+            <Input
+              placeholder={t('admin.grantNote')}
+              value={grant.note}
+              onChange={(e) => setGrant({ ...grant, note: e.target.value })}
+            />
+          </div>
           {grantMsg && <p className="text-sm text-slate-600">{grantMsg}</p>}
           <Button
             disabled={!grant.email.trim() || grantComp.isPending}

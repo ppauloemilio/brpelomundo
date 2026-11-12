@@ -9,6 +9,7 @@ import { AuthHero } from '@/components/auth/AuthHero';
 import { LegalFooter } from '@/components/legal/LegalFooter';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { cn } from '@/lib/utils';
 
 export function LoginPage() {
@@ -85,9 +86,9 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="login-email" className="text-sm font-medium text-slate-700">
+              <FieldLabel htmlFor="login-email" required>
                 {t('auth.email')}
-              </label>
+              </FieldLabel>
               <Input
                 id="login-email"
                 type="email"
@@ -101,9 +102,9 @@ export function LoginPage() {
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <label htmlFor="login-password" className="text-sm font-medium text-slate-700">
+                <FieldLabel htmlFor="login-password" required>
                   {t('auth.password')}
-                </label>
+                </FieldLabel>
                 <Link to="/forgot-password" className="text-xs font-medium text-brand-700 hover:underline">
                   {t('auth.forgotLink')}
                 </Link>

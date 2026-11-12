@@ -10,6 +10,7 @@ import { AuthHero } from '@/components/auth/AuthHero';
 import { LegalFooter, TermsConsent } from '@/components/legal/LegalFooter';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { cn } from '@/lib/utils';
 
 export function RegisterPage() {
@@ -116,9 +117,9 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-3">
             {(['full_name', 'username', 'email', 'password'] as const).map((field) => (
               <div key={field} className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700">
+                <FieldLabel required>
                   {t(`auth.${field === 'full_name' ? 'fullName' : field}`)}
-                </label>
+                </FieldLabel>
                 <Input
                   type={field === 'password' ? 'password' : field === 'email' ? 'email' : 'text'}
                   value={form[field]}
@@ -129,7 +130,7 @@ export function RegisterPage() {
               </div>
             ))}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">{t('auth.country')}</label>
+              <FieldLabel required>{t('auth.country')}</FieldLabel>
               <select
                 className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                 value={form.country}

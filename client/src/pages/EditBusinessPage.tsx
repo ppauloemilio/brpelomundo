@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { BUSINESS_CATEGORIES } from '@/lib/utils';
 
@@ -85,13 +86,28 @@ export function EditBusinessPage() {
       <Card>
         <CardHeader><CardTitle>{t('business.edit')}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <select className="flex h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-            {BUSINESS_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder={t('business.address')} />
-          <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder={t('business.city')} />
-          <Input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="WhatsApp (+1...)" />
+          <div>
+            <FieldLabel className="mb-1 block" required>{t('business.name')}</FieldLabel>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block" required>{t('business.category')}</FieldLabel>
+            <select className="flex h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
+              {BUSINESS_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block">{t('business.address')}</FieldLabel>
+            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder={t('business.address')} />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block">{t('business.city')}</FieldLabel>
+            <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder={t('business.city')} />
+          </div>
+          <div>
+            <FieldLabel className="mb-1 block">WhatsApp</FieldLabel>
+            <Input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="WhatsApp (+1...)" />
+          </div>
           <div className="h-64 rounded-lg overflow-hidden">
             <MapContainer center={[form.latitude, form.longitude]} zoom={13} style={{ height: '100%', width: '100%' }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />

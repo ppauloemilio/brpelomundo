@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel, RequiredMark } from '@/components/ui/FieldLabel';
 import { LocationCascade, resolveLocationForSave } from '@/components/profile/LocationCascade';
 import { INTEREST_OPTIONS } from '@/lib/profileConstants';
 import { cn } from '@/lib/utils';
@@ -110,7 +111,7 @@ export function OnboardingPage() {
             }}
           />
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">{t('onboarding.originCity')}</label>
+            <FieldLabel className="mb-1.5 block">{t('onboarding.originCity')}</FieldLabel>
             <Input
               value={originCity}
               onChange={(e) => setOriginCity(e.target.value)}
@@ -118,7 +119,7 @@ export function OnboardingPage() {
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">{t('onboarding.primarySkill')}</label>
+            <FieldLabel className="mb-1.5 block">{t('onboarding.primarySkill')}</FieldLabel>
             <Input
               value={primarySkill}
               onChange={(e) => setPrimarySkill(e.target.value)}
@@ -130,7 +131,10 @@ export function OnboardingPage() {
 
       {step === 2 && (
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="text-sm font-medium text-slate-800">{t('onboarding.whatLookingFor')}</p>
+          <p className="text-sm font-medium text-slate-800">
+            {t('onboarding.whatLookingFor')}
+            <RequiredMark />
+          </p>
           <div className="flex flex-wrap gap-2">
             {INTEREST_OPTIONS.map((key) => {
               const active = interests.includes(key);

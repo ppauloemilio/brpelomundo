@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { RequiredMark } from '@/components/ui/FieldLabel';
 
 export const legalLinks = [
   { to: '/sobre', labelKey: 'legal.navAbout' },
@@ -51,6 +52,7 @@ export function TermsConsent({
           {t('legal.navPrivacy')}
         </Link>
         {t('auth.termsAfter')}
+        <RequiredMark />
       </p>
     </div>
   );

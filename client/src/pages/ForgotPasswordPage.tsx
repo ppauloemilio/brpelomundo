@@ -6,6 +6,7 @@ import { AuthHero } from '@/components/auth/AuthHero';
 import { LegalFooter } from '@/components/legal/LegalFooter';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 
 export function ForgotPasswordPage() {
   const { t } = useTranslation();
@@ -53,9 +54,9 @@ export function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label htmlFor="forgot-email" className="text-sm font-medium text-slate-700">
+                <FieldLabel htmlFor="forgot-email" required>
                   {t('auth.email')}
-                </label>
+                </FieldLabel>
                 <Input
                   id="forgot-email"
                   type="email"

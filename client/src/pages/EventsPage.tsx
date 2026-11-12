@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { UserLink } from '@/components/ui/UserLink';
 import { ReportButton } from '@/components/trust/ReviewsSection';
@@ -104,22 +105,46 @@ export function EventsPage() {
       {showCreate && (
         <Card>
           <CardContent className="space-y-3 pt-5">
-            <Input placeholder={t('events.eventTitle')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <Textarea placeholder={t('events.description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} />
-              <Input type="time" value={form.event_time} onChange={(e) => setForm({ ...form, event_time: e.target.value })} />
+            <div>
+              <FieldLabel className="mb-1 block" required>{t('events.eventTitle')}</FieldLabel>
+              <Input placeholder={t('events.eventTitle')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
             </div>
-            <Input placeholder={t('events.location')} value={form.location_name} onChange={(e) => setForm({ ...form, location_name: e.target.value })} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input placeholder={t('events.city')} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-              <select className="flex h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}>
-                {Object.entries(COUNTRY_LABELS).filter(([c]) => c !== 'BR').map(([code, label]) => (
-                  <option key={code} value={code}>{label}</option>
-                ))}
-              </select>
+            <div>
+              <FieldLabel className="mb-1 block">{t('events.description')}</FieldLabel>
+              <Textarea placeholder={t('events.description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
             </div>
-            <Input placeholder={t('events.whatsapp')} value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <FieldLabel className="mb-1 block" required>{t('events.date')}</FieldLabel>
+                <Input type="date" value={form.event_date} onChange={(e) => setForm({ ...form, event_date: e.target.value })} required />
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block">{t('events.time')}</FieldLabel>
+                <Input type="time" value={form.event_time} onChange={(e) => setForm({ ...form, event_time: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <FieldLabel className="mb-1 block">{t('events.location')}</FieldLabel>
+              <Input placeholder={t('events.location')} value={form.location_name} onChange={(e) => setForm({ ...form, location_name: e.target.value })} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <FieldLabel className="mb-1 block" required>{t('events.city')}</FieldLabel>
+                <Input placeholder={t('events.city')} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
+              </div>
+              <div>
+                <FieldLabel className="mb-1 block" required>{t('events.country')}</FieldLabel>
+                <select className="flex h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} required>
+                  {Object.entries(COUNTRY_LABELS).filter(([c]) => c !== 'BR').map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <FieldLabel className="mb-1 block">{t('events.whatsapp')}</FieldLabel>
+              <Input placeholder={t('events.whatsapp')} value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>
               <Button

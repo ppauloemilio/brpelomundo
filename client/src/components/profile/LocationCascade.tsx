@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
+import { FieldLabel } from '@/components/ui/FieldLabel';
 import { cn } from '@/lib/utils';
 
 const OUTROS = 'OUTROS';
@@ -94,7 +95,7 @@ export function LocationCascade({
     <div className={cn('grid gap-3', showCountry ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
       {showCountry && !fixedCountry && (
         <div className="sm:col-span-3 sm:grid-cols-1">
-          <label className="mb-1 block text-xs font-medium text-slate-500">{t('auth.country')}</label>
+          <FieldLabel className="mb-1 block text-xs text-slate-500" required>{t('auth.country')}</FieldLabel>
           <select
             className="h-10 w-full rounded-lg border border-slate-200 px-2 text-sm"
             value={country}
@@ -115,7 +116,7 @@ export function LocationCascade({
       )}
 
       <div className={showCountry ? '' : 'sm:col-span-1'}>
-        <label className="mb-1 block text-xs font-medium text-slate-500">{t('editProfile.stateRegion')}</label>
+        <FieldLabel className="mb-1 block text-xs text-slate-500" required>{t('editProfile.stateRegion')}</FieldLabel>
         <select
           className="h-10 w-full rounded-lg border border-slate-200 px-2 text-sm"
           value={stateIso}
@@ -145,7 +146,7 @@ export function LocationCascade({
       </div>
 
       <div className={showCountry ? 'sm:col-span-2' : ''}>
-        <label className="mb-1 block text-xs font-medium text-slate-500">{t('editProfile.city')}</label>
+        <FieldLabel className="mb-1 block text-xs text-slate-500" required>{t('editProfile.city')}</FieldLabel>
         {!stateIsOther ? (
           <>
             <select
